@@ -1,4 +1,5 @@
 // modules/fastp.nf
+
 process FASTP {
     tag "$sample_id"
     publishDir "${params.outdir}/fastp", mode: params.publish_mode

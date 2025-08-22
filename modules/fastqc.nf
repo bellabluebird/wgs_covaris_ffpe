@@ -1,27 +1,29 @@
-#!/usr/bin/env nextflow
+// modules/fastqc.nf
 
 process FASTQC {
-    // quality control analysis on individual fastq files
-    // label 'process_low' = low resource requirements from config
-    // container has fastqc tool pre-installed
-    label 'process_low'
-    container 'ghcr.io/bf528/fastqc:latest'
-    publishDir params.outdir, mode: 'copy'
-
+    // label for job while running
+    tag "$sample_id"
+    // 
+    publishDir "${params.outdir}/fastqc", mode: params.publish_mode
+    
+    // conda option
+    conda 'bioconda::fastqc=0.12.1'
+    // docker profile option; these are published biocontainers
+    container 'quay.io/biocontainers/fastqc:0.12.1--hdfd78af_0'
+    
+    // input: paired reads from fastp
     input:
     tuple val(sample_id), path(reads)
-    // from transposed channel: ↓ ["sample1", sample1_R1.fastq]
-
+    
+    // output: fastqc html 
+    // output: zip files available to multiqc
     output:
-    tuple val(sample_id), path("*.html"), emit: html    // visual reports
-    tuple val(sample_id), path("*.zip"), emit: zip      // data for multiqc
-    // maintains sample_id for tracking through pipeline
-
-    shell:
+    tuple val(sample_id), path("*.html"), emit: html
+    tuple val(sample_id), path("*.zip"), emit: zip
+    
+    script:
     """
-    fastqc -t $task.cpus $reads
+    # run fastqc on the reads
+    fastqc --threads ${task.cpus} ${reads}
     """
-    // runs fastqc with allocated cpu threads
-    // $task.cpus gets cpu allocation from config
-    // generates html report + zip file with metrics
 }
