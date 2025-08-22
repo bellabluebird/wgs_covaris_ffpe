@@ -1,0 +1,4 @@
+# ignore changes to the following files
+results/
+refs/
+samples/
