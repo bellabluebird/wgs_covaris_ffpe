@@ -1,6 +1,10 @@
 #!/usr/bin/env nextflow
 
 // basic qc pipeline
+// BP MAKE alterations to handle 30x sequencing, this will only work on paired-end reads
+
+// enable modular functions
+nextflow.enable.dsl = 2
 
 // process modules
 include { FASTQC } from './modules/fastqc.nf'
