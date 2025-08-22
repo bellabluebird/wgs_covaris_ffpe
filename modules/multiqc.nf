@@ -1,18 +1,28 @@
-#!/usr/bin/env nextflow
+// modules/multiqc.nf
 
 process MULTIQC {
-    label 'process_low'
-    container 'ghcr.io/bf528/multiqc:latest'
-    publishDir params.outdir, mode: 'copy'
-
+    // where to publish results
+    // mode: set as copy
+    publishDir "${params.outdir}/multiqc", mode: params.publish_mode
+    
+    // conda option
+    conda 'bioconda::multiqc=1.19'
+    // docker profile option; these are published biocontainers
+    container 'quay.io/biocontainers/multiqc:1.19--pyhdfd78af_0'
+    
+    // path to file inputs
     input:
-    path('*')
-
+    path(reports)
+    
+    // output: multiqc report html
+    // output: raw data directory w csv, json etc
     output:
-    path("*.html")
-
-    shell:
+    path "multiqc_report.html", emit: html
+    path "multiqc_data", emit: data
+    
+    // run multiqc in the current working directory
+    script:
     """
-    multiqc . -f
+    multiqc .
     """
 }
