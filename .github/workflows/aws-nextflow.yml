@@ -1,0 +1,123 @@
+# naming the workflow so that it will show up in github actions
+name: Run Nextflow Pipeline on AWS
+
+# "on" defines when this workflow should run
+# "workflow_dispatch" means you manually trigger it by clicking a button on github's website
+# this is different from automatic triggers like "push" or "pull_request"
+on:
+  workflow_dispatch:
+    # input boxes that appear when you click "run workflow" on github
+    # this let you customize settings each time you run the pipeline without editing code. woohoo!
+    inputs:
+      # first input: where your DNA sequencing files are stored in aws s3
+      input_s3_path:
+        description: 'S3 path to input FASTQ files'  # text the user sees in the input box
+        required: true                                # user must fill this in - can't be empty
+        default: 's3://your-input-data-bucket/samples'  # pre-filled value to make it easier
+      
+      # second input: where you want the results to be saved in aws s3
+      output_s3_path:
+        description: 'S3 path for results'
+        required: true
+        default: 's3://your-nextflow-results-bucket/results'
+      
+      # third input: which aws region (geographic location) to use
+      # this shouldn't really change unless you set up your own aws infrastructure in a different region
+      aws_region:
+        description: 'AWS region'
+        required: true
+        default: 'us-east-1'
+      
+      # fourth input: which version of nextflow software to use
+      nextflow_version:
+        description: 'Nextflow version to use'
+        required: false
+        default: '23.10.1'
+
+# jobs are the actual work that gets done
+# you can have multiple jobs running in parallel, but we only need one
+jobs:
+  run-nextflow:
+    # this tells github to use an ubuntu linux virtual computer to run our commands
+    # github provides this for free and it comes with lots of software pre-installed
+    runs-on: ubuntu-latest
+    
+    # these are special permissions github needs to securely connect to aws
+    permissions:
+      id-token: write   # needed to create a temporary token to prove identity to aws
+      contents: read    # needed to download your code from the github repo
+    
+    # steps are the individual tasks that run in order
+    # each step runs completely before the next one starts
+    steps:
+      # step 1: download your code from github to the virtual computer
+      - name: Checkout repository
+        uses: actions/checkout@v4  # this is a pre-made action created by github
+      
+      # step 2: connect to aws using your stored credentials
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4  # pre-made action by amazon
+        with:
+          # this gets the aws role arn from your github secrets
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          # this uses whichever region you typed in when running the workflow
+          aws-region: ${{ github.event.inputs.aws_region }}
+      
+      # step 3: install java programming language if not installed
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'corretto'  # amazon's free version of java
+          java-version: '11'
+      
+      # step 4: download and install nextflow software
+      - name: Install Nextflow
+        # "run:" means execute these shell commands directly
+        run: |
+          # download the nextflow installer from the internet and run it
+          wget -qO- https://get.nextflow.io | bash -s -- -version ${{ github.event.inputs.nextflow_version }}
+          # move the nextflow program to a standard location where linux can find it
+          sudo mv nextflow /usr/local/bin/
+          # make the file executable (give permission to run it)
+          chmod +x /usr/local/bin/nextflow
+      
+      # step 5: test that aws connection is working correctly before starting the job
+      - name: Validate AWS setup
+        run: |
+          # check what aws account we're connected to
+          aws sts get-caller-identity
+          # check that our batch compute environment exists and is ready
+          aws batch describe-compute-environments --region ${{ github.event.inputs.aws_region }}
+      
+      # step 6: actually run our bioinformatics pipeline
+      - name: Run Nextflow pipeline
+        run: |
+          # run the main.nf file (pipeline) with these settings:
+          nextflow run main.nf \
+            -profile aws \                              # use aws batch for computing
+            --input_dir ${{ github.event.inputs.input_s3_path }} \     # where to find input files
+            --outdir ${{ github.event.inputs.output_s3_path }} \       # where to save results
+            -with-report nextflow_report.html \         # create a summary report
+            -with-timeline timeline.html \              # create a timeline of what ran when
+            -with-dag flowchart.html                    # create a flowchart of your pipeline
+      
+      # step 7: save the reports so you can download them from github later
+      - name: Upload Nextflow reports
+        if: always()  # do this step even if the pipeline failed for debugging
+        uses: actions/upload-artifact@v4
+        with:
+          name: nextflow-reports  # what to call the download package
+          # specific files to save:
+          path: |
+            nextflow_report.html   # summary of resource usage, success/failure
+            timeline.html          # when each process started and finished
+            flowchart.html         # visual diagram of your pipeline
+            .nextflow.log          # detailed log file for troubleshooting
+      
+      # step 8: clean up temporary files to avoid using too much storage space
+      - name: Cleanup
+        if: always()  # do this no matter what happened in previous steps
+        run: |
+          # remove temporary nextflow working files
+          # these can be large and we don't need them since results are in s3
+          rm -rf work/ .nextflow*
