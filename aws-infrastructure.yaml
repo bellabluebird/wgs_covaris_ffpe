@@ -1,0 +1,273 @@
+# version of cloudformation we're using + metadata about the template
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AWS Batch infrastructure for Nextflow pipeline execution'
+
+# parameters make the template modular and reusable
+Parameters:
+  # the ip address range for our private network in aws
+  VpcCidr:
+    Type: String
+    Default: '10.0.0.0/16'
+    Description: CIDR block for the VPC
+  
+  # the ip address range for the subnet within our network
+  SubnetCidr:
+    Type: String
+    Default: '10.0.1.0/24'
+    Description: CIDR block for the subnet
+  
+  # what types of instances aws batch can use for your jobs
+  InstanceTypes:
+    Type: CommaDelimitedList
+    Default: 't3.medium,t3.large'
+    Description: EC2 instance types for compute environment
+  
+  # maximum number of cpu cores that aws batch can use at once
+  # this prevents runaway costs if something goes wrong
+  MaxvCpus:
+    Type: Number
+    Default: 8
+    Description: Maximum number of vCPUs for the compute environment
+
+# resources are the actual aws services that get created
+Resources:
+  
+  # ========== NETWORKING SECTION ==========
+  # these resources create a private network for your compute instances
+  
+  # vpc = virtual private cloud = your own private network within aws
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr  # uses the parameter we defined above
+      EnableDnsHostnames: true  # allows instances to have human-readable names
+      EnableDnsSupport: true    # allows instances to resolve internet domain names
+      Tags:
+        - Key: Name
+          Value: nextflow-vpc   # name that shows up in aws console
+
+  # subnet = network within the vpc where instances live
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref SubnetCidr
+      AvailabilityZone: !Select [0, !GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: nextflow-public-subnet
+
+  # internet gateway = connection from your private network to the internet
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: nextflow-igw
+
+  # attach the internet gateway to the vpc
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  # route table = directions for how network traffic should flow
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: nextflow-public-rt
+
+  # route = specific rule sending internet traffic to the internet gateway
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway  # make sure gateway is attached first
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0  # means "all internet traffic"
+      GatewayId: !Ref InternetGateway
+
+  # connect the subnet to the route table
+  SubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+
+  # ========== SECURITY SECTION ==========
+  
+  # security group = firewall rules for the compute instances
+  BatchSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for AWS Batch compute environment
+      VpcId: !Ref VPC
+      # egress = outbound traffic (what instances can connect TO)
+      SecurityGroupEgress:
+        - IpProtocol: -1      # -1 means "all protocols"
+          CidrIp: 0.0.0.0/0   # means "anywhere on the internet"
+      # note: no ingress rules means nothing can connect TO these instances from outside
+      # this is secure - instances can download software but can't be hacked from internet
+      # i think (i am not a cybersecurity expert, so don't take this for granted)
+      Tags:
+        - Key: Name
+          Value: nextflow-batch-sg
+
+  # ========== PERMISSIONS SECTION ==========
+  # iam roles define what aws services can do on your behalf
+  
+  # role that allows the aws batch service to manage compute instances
+  BatchServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      # "assumerolepolicydocument" defines who can use this role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: batch.amazonaws.com  # only aws batch service can use this role
+            Action: sts:AssumeRole
+      # predefined policy that gives batch the permissions it needs
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole
+
+  # role that gets attached to the actual compute instances
+  BatchInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com  # only ec2 instances can use this role
+            Action: sts:AssumeRole
+      # predefined policy that allows instances to work with batch
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role
+      # custom policy that allows instances to access your s3 buckets
+      Policies:
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject     # download files from s3
+                  - s3:PutObject     # upload files to s3
+                  - s3:DeleteObject  # delete files from s3
+                  - s3:ListBucket    # see what files are in s3 buckets
+                Resource:
+                  - 'arn:aws:s3:::your-*'      # any bucket starting with "your-"
+                  - 'arn:aws:s3:::your-*/*'    # any file in those buckets
+
+  # instance profile = wrapper that lets ec2 instances use the iam role
+  BatchInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref BatchInstanceRole
+
+  # ========== COMPUTE CONFIGURATION SECTION ==========
+  
+  # launch template = blueprint for how to configure new compute instances
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: nextflow-batch-lt
+      LaunchTemplateData:
+        # userdata = script that runs when an instance first starts up
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            # update all software packages to latest versions
+            yum update -y
+            # install cloudwatch agent for monitoring (optional but helpful)
+            yum install -y amazon-cloudwatch-agent
+            
+            # configure docker storage settings for better performance
+            mkdir -p /etc/docker
+            cat > /etc/docker/daemon.json << 'EOF'
+            {
+              "storage-driver": "overlay2",
+              "storage-opts": [
+                "overlay2.override_kernel_check=true"
+              ]
+            }
+            EOF
+            
+            # start docker service (needed for running containers)
+            service docker start
+            # signal to cloudformation that this instance finished setting up successfully
+            /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource ComputeEnvironment --region ${AWS::Region}
+
+  # ========== AWS BATCH SECTION ==========
+  
+  # compute environment = pool of instances that batch can use for running jobs
+  ComputeEnvironment:
+    Type: AWS::Batch::ComputeEnvironment
+    Properties:
+      Type: MANAGED       # aws automatically handles adding/removing instances
+      State: ENABLED      # ready to accept jobs
+      ComputeEnvironmentName: nextflow-compute-env
+      ServiceRole: !GetAtt BatchServiceRole.Arn  # use the service role we created
+      ComputeResources:
+        Type: EC2         # use regular ec2 instances (not fargate)
+        MinvCpus: 0       # when idle, use zero instances (saves money)
+        MaxvCpus: !Ref MaxvCpus  # maximum cpu cores as specified in parameters
+        DesiredvCpus: 0   # start with zero instances
+        InstanceTypes: !Ref InstanceTypes  # use the instance types from parameters
+        InstanceRole: !GetAtt BatchInstanceProfile.Arn  # permissions for instances
+        SecurityGroupIds:
+          - !Ref BatchSecurityGroup  # firewall rules
+        Subnets:
+          - !Ref PublicSubnet        # which subnet to put instances in
+        LaunchTemplate:
+          LaunchTemplateId: !Ref LaunchTemplate  # use our custom launch template
+          Version: '$Latest'       # always use the newest version
+        Tags:
+          Name: nextflow-batch-instance
+
+  # job queue = waiting area where nextflow submits jobs to be processed
+  JobQueue:
+    Type: AWS::Batch::JobQueue
+    Properties:
+      JobQueueName: nextflow-compute-queue  # this name must match your nextflow.config
+      State: ENABLED    # ready to accept jobs
+      Priority: 100     # if you had multiple queues, higher numbers go first
+      ComputeEnvironmentOrder:
+        - Order: 1                          # priority order if multiple compute environments
+          ComputeEnvironment: !Ref ComputeEnvironment
+
+# values that get displayed after the template finishes creating resources
+# useful for debugging or for connecting to other templates
+Outputs:
+  # arn = amazon resource name - unique identifier for aws resources
+  ComputeEnvironmentArn:
+    Description: ARN of the Batch compute environment
+    Value: !Ref ComputeEnvironment
+    Export:
+      Name: !Sub '${AWS::StackName}-ComputeEnvironment'  # makes it available to other stacks
+
+  JobQueueArn:
+    Description: ARN of the Batch job queue
+    Value: !Ref JobQueue
+    Export:
+      Name: !Sub '${AWS::StackName}-JobQueue'
+
+  VPCId:
+    Description: VPC ID
+    Value: !Ref VPC
+    Export:
+      Name: !Sub '${AWS::StackName}-VPC'
+
+  SubnetId:
+    Description: Subnet ID
+    Value: !Ref PublicSubnet
+    Export:
+      Name: !Sub '${AWS::StackName}-Subnet'
