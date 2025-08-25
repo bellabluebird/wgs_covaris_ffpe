@@ -17,9 +17,10 @@ Parameters:
     Description: CIDR block for the subnet
   
   # what types of instances aws batch can use for your jobs
+  # cost-effective small instances for genomics qc workflows
   InstanceTypes:
     Type: CommaDelimitedList
-    Default: 't3.medium,t3.large'
+    Default: 'c5.large,m5.large'
     Description: EC2 instance types for compute environment
   
   # maximum number of cpu cores that aws batch can use at once
