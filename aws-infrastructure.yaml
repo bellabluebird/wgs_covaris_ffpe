@@ -1,3 +1,4 @@
+# uploaded to cloudformation on aws to set up aws batch + create new stack with these specifications
 # version of cloudformation we're using + metadata about the template
 AWSTemplateFormatVersion: '2010-09-09'
 Description: 'AWS Batch infrastructure for Nextflow pipeline execution'
