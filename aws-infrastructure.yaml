@@ -17,11 +17,11 @@ Parameters:
     Default: '10.0.1.0/24'
     Description: CIDR block for the subnet
   
-  # what types of instances aws batch can use for your jobs
-  # cost-effective small instances for genomics qc workflows
+  # what types of instances aws batch can use for your jobs  
+  # using optimal for better availability across regions
   InstanceTypes:
     Type: CommaDelimitedList
-    Default: 'c5.large,m5.large'
+    Default: 'optimal'
     Description: EC2 instance types for compute environment
   
   # maximum number of cpu cores that aws batch can use at once

@@ -22,11 +22,10 @@ on:
         default: 's3://your-nextflow-results-bucket/results'
       
       # third input: which aws region (geographic location) to use
-      # this shouldn't really change unless you set up your own aws infrastructure in a different region
+      # use the same region where you deployed your cloudformation stack
       aws_region:
-        description: 'AWS region'
+        description: 'AWS region (e.g., us-east-1, us-east-2, eu-west-1)'
         required: true
-        default: 'us-east-1'
       
       # fourth input: which version of nextflow software to use
       nextflow_version:
