@@ -177,40 +177,23 @@ Resources:
 
   # ========== COMPUTE CONFIGURATION SECTION ==========
   
-  # launch template = blueprint for how to configure new compute instances
+  # super simplified launch template 
   LaunchTemplate:
     Type: AWS::EC2::LaunchTemplate
     Properties:
       LaunchTemplateName: nextflow-batch-lt
       LaunchTemplateData:
-        # userdata = script that runs when an instance first starts up
+        # minimal userdata to reduce complexity
         UserData:
           Fn::Base64: !Sub |
             #!/bin/bash
-            # update all software packages to latest versions
             yum update -y
-            # install cloudwatch agent for monitoring (optional but helpful)
-            yum install -y amazon-cloudwatch-agent
-            
-            # configure docker storage settings for better performance
-            mkdir -p /etc/docker
-            cat > /etc/docker/daemon.json << 'EOF'
-            {
-              "storage-driver": "overlay2",
-              "storage-opts": [
-                "overlay2.override_kernel_check=true"
-              ]
-            }
-            EOF
-            
-            # start docker service (needed for running containers)
             service docker start
-            # signal to cloudformation that this instance finished setting up successfully
-            /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource ComputeEnvironment --region ${AWS::Region}
 
   # ========== AWS BATCH SECTION ==========
   
   # compute environment = pool of instances that batch can use for running jobs
+  # simplified version without launch template for better compatibility
   ComputeEnvironment:
     Type: AWS::Batch::ComputeEnvironment
     Properties:
@@ -220,6 +203,7 @@ Resources:
       ServiceRole: !GetAtt BatchServiceRole.Arn  # use the service role we created
       ComputeResources:
         Type: EC2         # use regular ec2 instances (not fargate)
+        AllocationStrategy: BEST_FIT_PROGRESSIVE  # better instance allocation
         MinvCpus: 0       # when idle, use zero instances (saves money)
         MaxvCpus: !Ref MaxvCpus  # maximum cpu cores as specified in parameters
         DesiredvCpus: 0   # start with zero instances
@@ -229,9 +213,6 @@ Resources:
           - !Ref BatchSecurityGroup  # firewall rules
         Subnets:
           - !Ref PublicSubnet        # which subnet to put instances in
-        LaunchTemplate:
-          LaunchTemplateId: !Ref LaunchTemplate  # use our custom launch template
-          Version: '$Latest'       # always use the newest version
         Tags:
           Name: nextflow-batch-instance
 
