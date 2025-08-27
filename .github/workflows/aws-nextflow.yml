@@ -125,10 +125,10 @@ jobs:
             stdout
             
             script:
-            """
+            '''
             echo "=== AWS/S3 Access Test from Batch Container ==="
-            echo "Current user: \$(whoami)"
-            echo "Current directory: \$(pwd)"
+            echo "Current user: $(whoami)"
+            echo "Current directory: $(pwd)"
             echo ""
             
             echo "Testing AWS CLI availability:"
@@ -153,7 +153,7 @@ jobs:
             echo ""
             
             echo "=== End S3 Access Test ==="
-            """
+            '''
           }
           
           workflow {
