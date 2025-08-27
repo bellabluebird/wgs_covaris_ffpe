@@ -24,21 +24,13 @@ if (!params.input_dir) {
 // creating input channel from paired fastq files
 // try multiple patterns to be more flexible with file naming
 ch_input = Channel
-    .fromFilePairs([
-        "${params.input_dir}/*_{R1,R2}.{fastq,fq}.gz",
-        "${params.input_dir}/*_{1,2}.{fastq,fq}.gz",
-        "${params.input_dir}/*{R1,R2}.{fastq,fq}.gz",
-        "${params.input_dir}/*{1,2}.{fastq,fq}.gz"
-    ], size: 2)
+    .fromFilePairs("${params.input_dir}/*_{R1,R2}.fastq.gz", size: 2)
     .ifEmpty { 
         log.error "Cannot find any paired FASTQ files in: ${params.input_dir}"
-        log.error "Tried patterns:"
-        log.error "  - *_{R1,R2}.{fastq,fq}.gz"
-        log.error "  - *_{1,2}.{fastq,fq}.gz" 
-        log.error "  - *{R1,R2}.{fastq,fq}.gz"
-        log.error "  - *{1,2}.{fastq,fq}.gz"
-        log.error "Make sure your files follow one of these naming conventions"
-        error "No paired FASTQ files found - see patterns above"
+        log.error "Expected pattern: *_{R1,R2}.fastq.gz"
+        log.error "Your files should be named like: ERR008539_R1.fastq.gz, ERR008539_R2.fastq.gz"
+        log.error "Full pattern being searched: ${params.input_dir}/*_{R1,R2}.fastq.gz"
+        error "No paired FASTQ files found"
     }
 
 // main workflow
