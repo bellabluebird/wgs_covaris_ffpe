@@ -100,14 +100,22 @@ jobs:
           echo "Total file count:"
           aws s3 ls ${{ github.event.inputs.input_s3_path }}/ --recursive | wc -l
       
-      # step 6: actually run our bioinformatics pipeline
+      # step 6: debug what parameters we're about to pass
+      - name: Debug Nextflow parameters
+        run: |
+          echo "Input S3 path: '${{ github.event.inputs.input_s3_path }}'"
+          echo "Output S3 path: '${{ github.event.inputs.output_s3_path }}'"
+          echo "AWS region: '${{ github.event.inputs.aws_region }}'"
+          echo "Nextflow version: '${{ github.event.inputs.nextflow_version }}'"
+      
+      # step 7: actually run our bioinformatics pipeline
       - name: Run Nextflow pipeline
         run: |
           # run the main.nf file (pipeline) with these settings:
           nextflow run main.nf \
             -profile aws \                              # use aws batch for computing
-            --input_dir ${{ github.event.inputs.input_s3_path }} \     # where to find input files
-            --outdir ${{ github.event.inputs.output_s3_path }} \       # where to save results
+            --input_dir "${{ github.event.inputs.input_s3_path }}" \     # where to find input files
+            --outdir "${{ github.event.inputs.output_s3_path }}" \       # where to save results
             -with-report nextflow_report.html \         # create a summary report
             -with-timeline timeline.html \              # create a timeline of what ran when
             -with-dag flowchart.html                    # create a flowchart of your pipeline
