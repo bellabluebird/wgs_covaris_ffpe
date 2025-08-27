@@ -13,13 +13,13 @@ on:
       input_s3_path:
         description: 'S3 path to input FASTQ files'  # text the user sees in the input box
         required: true                                # user must fill this in - can't be empty
-        default: 's3://your-input-data-bucket/samples'  # pre-filled value to make it easier
+        default: 's3://bp-wgs-covaris-input-data/samples'  # your actual input bucket
       
       # second input: where you want the results to be saved in aws s3
       output_s3_path:
         description: 'S3 path for results'
         required: true
-        default: 's3://your-nextflow-results-bucket/results'
+        default: 's3://bp-wgs-covaris-nextflow-results/results'
       
       # third input: which aws region (geographic location) to use
       # use the same region where you deployed your cloudformation stack
