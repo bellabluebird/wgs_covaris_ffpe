@@ -12,13 +12,17 @@ include { FASTP } from './modules/fastp.nf'
 include { MULTIQC } from './modules/multiqc.nf'
 
 // parameters
-params.input_dir = ""
+// input_dir comes from command line --input_dir parameter
 params.outdir = "./results"
 params.publish_mode = 'copy'
 
-// input validation
+// input validation with debugging
+log.info "DEBUG: Received input_dir parameter: '${params.input_dir}'"
+log.info "DEBUG: Parameter type: ${params.input_dir?.getClass()}"
+log.info "DEBUG: Parameter length: ${params.input_dir?.length()}"
+
 if (!params.input_dir) {
-    error "Please provide input directory with --input_dir"
+    error "Please provide input directory with --input_dir (received: '${params.input_dir}')"
 }
 
 // creating input channel from paired fastq files
