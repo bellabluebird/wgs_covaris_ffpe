@@ -11,6 +11,36 @@ include { FASTQC } from './modules/fastqc.nf'
 include { FASTP } from './modules/fastp.nf'
 include { MULTIQC } from './modules/multiqc.nf'
 
+// debugging process to test S3 access
+process DEBUG_S3_ACCESS {
+    tag "s3-debug"
+    
+    output:
+    stdout
+    
+    script:
+    """
+    echo "=== S3 DEBUG FROM WITHIN NEXTFLOW PROCESS ==="
+    echo "Testing AWS CLI:"
+    which aws || echo "AWS CLI not found"
+    aws --version || echo "AWS version failed"
+    
+    echo "Testing credentials:"
+    aws sts get-caller-identity || echo "Credentials failed"
+    
+    echo "Testing S3 bucket access:"
+    aws s3 ls s3://bp-wgs-covaris-input-data/ || echo "Bucket access failed"
+    
+    echo "Testing samples folder:"
+    aws s3 ls s3://bp-wgs-covaris-input-data/samples/ || echo "Samples folder failed"
+    
+    echo "Looking for fastq files:"
+    aws s3 ls s3://bp-wgs-covaris-input-data/samples/ | grep fastq || echo "No fastq files found via AWS CLI"
+    
+    echo "=== END S3 DEBUG ==="
+    """
+}
+
 // parameters
 // input_dir comes from command line --input_dir parameter
 params.outdir = "./results"
@@ -25,8 +55,54 @@ if (!params.input_dir) {
     error "Please provide input directory with --input_dir (received: '${params.input_dir}')"
 }
 
-// creating input channel from paired fastq files
-// try multiple patterns to be more flexible with file naming
+// creating input channel from paired fastq files with extensive debugging
+log.info "=== FILE DISCOVERY DEBUGGING ==="
+log.info "Input directory: ${params.input_dir}"
+log.info "AWS region from config: ${aws.region ?: 'not set'}"
+log.info "Current working directory: ${workflow.launchDir}"
+log.info "Work directory: ${workflow.workDir}"
+
+// test different approaches to find files
+log.info "Testing different file discovery methods:"
+
+// Method 1: Try the current pattern
+log.info "Method 1: Using fromFilePairs with pattern *_R{1,2}.fastq.gz"
+def pattern1 = "${params.input_dir}/*_R{1,2}.fastq.gz"
+log.info "Full pattern: ${pattern1}"
+
+try {
+    def test_ch1 = Channel.fromPath(pattern1)
+    test_ch1.view { "Method 1 found file: ${it}" }
+    log.info "Method 1: Pattern matching attempted"
+} catch (Exception e) {
+    log.error "Method 1 failed with error: ${e.getMessage()}"
+}
+
+// Method 2: Try alternative pattern
+log.info "Method 2: Using fromPath with pattern *_R*.fastq.gz"
+def pattern2 = "${params.input_dir}/*_R*.fastq.gz"
+log.info "Full pattern: ${pattern2}"
+
+try {
+    def test_ch2 = Channel.fromPath(pattern2)
+    test_ch2.view { "Method 2 found file: ${it}" }
+} catch (Exception e) {
+    log.error "Method 2 failed with error: ${e.getMessage()}"
+}
+
+// Method 3: Try listing everything in the directory
+log.info "Method 3: Listing all files in directory"
+def pattern3 = "${params.input_dir}/*"
+try {
+    def test_ch3 = Channel.fromPath(pattern3)
+    test_ch3.view { "Method 3 found file: ${it}" }
+} catch (Exception e) {
+    log.error "Method 3 failed with error: ${e.getMessage()}"
+}
+
+log.info "=== END FILE DISCOVERY DEBUGGING ==="
+
+// Now try the actual file pairing
 ch_input = Channel
     .fromFilePairs("${params.input_dir}/*_R{1,2}.fastq.gz", size: 2)
     .ifEmpty { 
@@ -34,11 +110,23 @@ ch_input = Channel
         log.error "Expected pattern: *_R{1,2}.fastq.gz"
         log.error "Your files should be named like: ERR008539_R1.fastq.gz, ERR008539_R2.fastq.gz"
         log.error "Full pattern being searched: ${params.input_dir}/*_R{1,2}.fastq.gz"
+        
+        // Additional debugging information
+        log.error "=== DEBUGGING INFO ==="
+        log.error "AWS region: ${aws.region ?: 'not configured'}"
+        log.error "Workflow launch dir: ${workflow.launchDir}"
+        log.error "Workflow work dir: ${workflow.workDir}"
+        log.error "Nextflow version: ${nextflow.version}"
+        log.error "=== END DEBUGGING INFO ==="
+        
         error "No paired FASTQ files found"
     }
 
 // main workflow
 workflow {
+    // First, run S3 debugging process
+    DEBUG_S3_ACCESS() | view { "S3 DEBUG OUTPUT: $it" }
+    
     // debug: show what files were found
     ch_input.view { sample_id, files -> "Found sample: ${sample_id} with files: ${files}" }
     
