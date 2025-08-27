@@ -52,12 +52,13 @@ workflow {
     // preprocessing with fastp
     FASTP(ch_input)
     
-    // post-trim fastqc
-    FASTQC(FASTP.out.reads)
+    // post-trim fastqc - create alias to make FASTQC reusable
+    FASTQC_TRIMMED = FASTQC
+    FASTQC_TRIMMED(FASTP.out.reads)
     
     // collect all reports for multiqc
     multiqc_input = FASTQC.out.zip
-        .mix(FASTQC.out.zip)
+        .mix(FASTQC_TRIMMED.out.zip)
         .mix(FASTP.out.json)
         .collect()
     
