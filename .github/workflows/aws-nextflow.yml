@@ -67,7 +67,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'corretto'  # amazon's free version of java
-          java-version: '11'
+          java-version: '17'        # nextflow requires java 17 or later
       
       # step 4: download and install nextflow software
       - name: Install Nextflow
