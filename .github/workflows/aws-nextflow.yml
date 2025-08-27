@@ -88,6 +88,18 @@ jobs:
           # check that our batch compute environment exists and is ready
           aws batch describe-compute-environments --region ${{ github.event.inputs.aws_region }}
       
+      # step 5b: debug s3 contents to see what files are actually there
+      - name: Debug S3 input files
+        run: |
+          echo "Listing contents of input S3 bucket:"
+          aws s3 ls ${{ github.event.inputs.input_s3_path }}/ --recursive
+          echo ""
+          echo "Looking specifically for fastq.gz files:"
+          aws s3 ls ${{ github.event.inputs.input_s3_path }}/ --recursive | grep "\.fastq\.gz"
+          echo ""
+          echo "Total file count:"
+          aws s3 ls ${{ github.event.inputs.input_s3_path }}/ --recursive | wc -l
+      
       # step 6: actually run our bioinformatics pipeline
       - name: Run Nextflow pipeline
         run: |
