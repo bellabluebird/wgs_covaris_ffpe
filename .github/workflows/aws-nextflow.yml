@@ -124,38 +124,34 @@ jobs:
             output:
             stdout
             
-            script:
-            '''
-            echo "=== AWS/S3 Access Test from Batch Container ==="
-            echo "Current user: $(whoami)"
-            echo "Current directory: $(pwd)"
-            echo ""
-            
-            echo "Testing AWS CLI availability:"
-            which aws || echo "AWS CLI not found"
-            aws --version || echo "AWS CLI version failed"
-            echo ""
-            
-            echo "Testing AWS credentials:"
-            aws sts get-caller-identity || echo "AWS credentials failed"
-            echo ""
-            
-            echo "Testing S3 access:"
-            aws s3 ls s3://bp-wgs-covaris-input-data/ || echo "S3 bucket listing failed"
-            echo ""
-            
-            echo "Testing specific file listing:"
-            aws s3 ls s3://bp-wgs-covaris-input-data/samples/ || echo "S3 samples folder listing failed"
-            echo ""
-            
-            echo "Testing file pattern with AWS CLI:"
-            aws s3 ls s3://bp-wgs-covaris-input-data/samples/ | grep "\.fastq\.gz" || echo "No fastq.gz files found"
-            echo ""
-            
-            echo "=== End S3 Access Test ==="
-            '''
-          }
-          
+            script: |
+              echo "=== AWS/S3 Access Test from Batch Container ==="
+              echo "Current user: $(whoami)"
+              echo "Current directory: $(pwd)"
+              echo ""
+              
+              echo "Testing AWS CLI availability:"
+              which aws || echo "AWS CLI not found"
+              aws --version || echo "AWS CLI version failed"
+              echo ""
+              
+              echo "Testing AWS credentials:"
+              aws sts get-caller-identity || echo "AWS credentials failed"
+              echo ""
+              
+              echo "Testing S3 access:"
+              aws s3 ls s3://bp-wgs-covaris-input-data/ || echo "S3 bucket listing failed"
+              echo ""
+              
+              echo "Testing specific file listing:"
+              aws s3 ls s3://bp-wgs-covaris-input-data/samples/ || echo "S3 samples folder listing failed"
+              echo ""
+              
+              echo "Testing file pattern with AWS CLI:"
+              aws s3 ls s3://bp-wgs-covaris-input-data/samples/ | grep "\.fastq\.gz" || echo "No fastq.gz files found"
+              echo ""
+              
+              echo "=== End S3 Access Test ==="
           workflow {
             TEST_S3_ACCESS() | view
           }
