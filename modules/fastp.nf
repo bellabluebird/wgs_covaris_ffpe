@@ -7,7 +7,7 @@ process FASTP {
     // conda option 
     conda 'bioconda::fastp=0.23.4'
     // docker profile option; these are published biocontainers
-    container 'quay.io/biocontainers/fastp:0.23.4--h125f33a_5'
+    container 'staphb/fastp:0.23.4'
     
     // input: paired fastq files
     input:
