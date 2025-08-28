@@ -13,6 +13,10 @@ include { MULTIQC } from './modules/multiqc.nf'
 
 // debugging process to test S3 access
 process DEBUG_S3_ACCESS {
+    executor 'awsbatch'
+    queue 'nextflow-compute-queue'
+    container 'amazonlinux:2'
+    
     output:
     stdout
     
@@ -56,7 +60,7 @@ if (!params.input_dir) {
 // creating input channel from paired fastq files with extensive debugging
 log.info "=== FILE DISCOVERY DEBUGGING ==="
 log.info "Input directory: ${params.input_dir}"
-log.info "AWS region from config: ${aws.region ?: 'not set'}"
+log.info "AWS region from config: ${params.aws_region ?: 'not set'}"
 log.info "Current working directory: ${workflow.launchDir}"
 log.info "Work directory: ${workflow.workDir}"
 
@@ -111,7 +115,7 @@ ch_input = Channel
         
         // Additional debugging information
         log.error "=== DEBUGGING INFO ==="
-        log.error "AWS region: ${aws.region ?: 'not configured'}"
+        log.error "AWS region: ${params.aws_region ?: 'not configured'}"
         log.error "Workflow launch dir: ${workflow.launchDir}"
         log.error "Workflow work dir: ${workflow.workDir}"
         log.error "Nextflow version: ${nextflow.version}"
@@ -129,19 +133,18 @@ workflow {
     ch_input.view { sample_id, files -> "Found sample: ${sample_id} with files: ${files}" }
     
     // raw fastqc
-    FASTQC(ch_input)
+    fastqc_raw = FASTQC(ch_input)
     
     // preprocessing with fastp
-    FASTP(ch_input)
+    fastp_results = FASTP(ch_input)
     
-    // post-trim fastqc - create alias to make FASTQC reusable
-    FASTQC_TRIMMED = FASTQC
-    FASTQC_TRIMMED(FASTP.out.reads)
+    // post-trim fastqc on cleaned reads
+    fastqc_trimmed = FASTQC(fastp_results.reads)
     
     // collect all reports for multiqc
-    multiqc_input = FASTQC.out.zip
-        .mix(FASTQC_TRIMMED.out.zip)
-        .mix(FASTP.out.json)
+    multiqc_input = fastqc_raw.zip
+        .mix(fastqc_trimmed.zip)
+        .mix(fastp_results.json)
         .collect()
     
     // multiqc report
