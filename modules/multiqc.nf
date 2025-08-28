@@ -7,8 +7,7 @@ process MULTIQC {
     
     // conda option
     conda 'bioconda::multiqc=1.19'
-    // docker profile option; these are published biocontainers
-    container 'staphb/multiqc:1.19'
+    // REMOVED hardcoded container - let config handle this
     
     // path to file inputs
     input:
@@ -25,4 +24,5 @@ process MULTIQC {
     """
     multiqc .
     """
+
 }

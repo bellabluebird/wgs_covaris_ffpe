@@ -8,8 +8,7 @@ process FASTQC {
     
     // conda option
     conda 'bioconda::fastqc=0.12.1'
-    // docker profile option; these are published biocontainers
-    container 'staphb/fastqc:0.12.1'
+    // REMOVED hardcoded container - let config handle this
     
     // input: paired reads from fastp
     input:

@@ -6,8 +6,7 @@ process FASTP {
     
     // conda option 
     conda 'bioconda::fastp=0.23.4'
-    // docker profile option; these are published biocontainers
-    container 'staphb/fastp:0.23.4'
+    // REMOVED hardcoded container - let config handle this
     
     // input: paired fastq files
     input:
@@ -31,7 +30,6 @@ process FASTP {
         --out2 ${sample_id}_R2_trimmed.fastq.gz \\
         --json ${sample_id}.fastp.json \\
         --html ${sample_id}.fastp.html \\
-        # number of cpu threads allocated by nextflow
         --thread ${task.cpus} \\
         --detect_adapter_for_pe
     """
