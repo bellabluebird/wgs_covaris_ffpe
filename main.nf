@@ -8,6 +8,7 @@ nextflow.enable.dsl = 2
 
 // process modules
 include { FASTQC } from './modules/fastqc.nf'
+include { FASTQC as FASTQC_TRIMMED } from './modules/fastqc.nf'
 include { FASTP } from './modules/fastp.nf'
 include { MULTIQC } from './modules/multiqc.nf'
 
@@ -126,7 +127,7 @@ workflow {
     fastp_results = FASTP(ch_input)
     
     // post-trim fastqc on cleaned reads
-    fastqc_trimmed = FASTQC(fastp_results.reads)
+    fastqc_trimmed = FASTQC_TRIMMED(fastp_results.reads)
     
     // collect all reports for multiqc
     multiqc_input = fastqc_raw.zip
