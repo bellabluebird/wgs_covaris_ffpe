@@ -33,47 +33,12 @@ log.info "AWS region from config: ${params.aws_region ?: 'not set'}"
 log.info "Current working directory: ${workflow.launchDir}"
 log.info "Work directory: ${workflow.workDir}"
 
-// test different approaches to find files
-log.info "Testing different file discovery methods:"
-
-// Method 1: Try the current pattern
-log.info "Method 1: Using fromFilePairs with pattern *_R{1,2}.fastq.gz"
+// Using the current pattern
+log.info "Using fromFilePairs with pattern *_R{1,2}.fastq.gz"
 def pattern1 = "${params.input_dir}/*_R{1,2}.fastq.gz"
 log.info "Full pattern: ${pattern1}"
 
-try {
-    def test_ch1 = Channel.fromPath(pattern1)
-    test_ch1.view { "Method 1 found file: ${it}" }
-    log.info "Method 1: Pattern matching attempted"
-} catch (Exception e) {
-    log.error "Method 1 failed with error: ${e.getMessage()}"
-}
-
-// Method 2: Try alternative pattern
-log.info "Method 2: Using fromPath with pattern *_R*.fastq.gz"
-def pattern2 = "${params.input_dir}/*_R*.fastq.gz"
-log.info "Full pattern: ${pattern2}"
-
-try {
-    def test_ch2 = Channel.fromPath(pattern2)
-    test_ch2.view { "Method 2 found file: ${it}" }
-} catch (Exception e) {
-    log.error "Method 2 failed with error: ${e.getMessage()}"
-}
-
-// Method 3: Try listing everything in the directory
-log.info "Method 3: Listing all files in directory"
-def pattern3 = "${params.input_dir}/*"
-try {
-    def test_ch3 = Channel.fromPath(pattern3)
-    test_ch3.view { "Method 3 found file: ${it}" }
-} catch (Exception e) {
-    log.error "Method 3 failed with error: ${e.getMessage()}"
-}
-
-log.info "=== END FILE DISCOVERY DEBUGGING ==="
-
-// Create S3 file pairs manually (more reliable for S3)
+// Create S3 file pairs manually
 log.info "Creating S3 file channels manually for ERR008539"
 ch_input = Channel.of([
     'ERR008539', 
