@@ -12,38 +12,6 @@ include { FASTQC as FASTQC_TRIMMED } from './modules/fastqc.nf'
 include { FASTP } from './modules/fastp.nf'
 include { MULTIQC } from './modules/multiqc.nf'
 
-// debugging process to test S3 access
-process DEBUG_S3_ACCESS {
-    executor 'awsbatch'
-    queue 'nextflow-compute-queue'
-    container 'amazonlinux:2'
-    
-    output:
-    stdout
-    
-    script:
-    """
-    echo "=== S3 DEBUG FROM WITHIN NEXTFLOW PROCESS ==="
-    echo "Testing AWS CLI:"
-    which aws || echo "AWS CLI not found"
-    aws --version || echo "AWS version failed"
-    
-    echo "Testing credentials:"
-    aws sts get-caller-identity || echo "Credentials failed"
-    
-    echo "Testing S3 bucket access:"
-    aws s3 ls s3://bp-wgs-covaris-input-data/ || echo "Bucket access failed"
-    
-    echo "Testing samples folder:"
-    aws s3 ls s3://bp-wgs-covaris-input-data/samples/ || echo "Samples folder failed"
-    
-    echo "Looking for fastq files:"
-    aws s3 ls s3://bp-wgs-covaris-input-data/samples/ | grep fastq || echo "No fastq files found via AWS CLI"
-    
-    echo "=== END S3 DEBUG ==="
-    """
-}
-
 // parameters
 // input_dir comes from command line --input_dir parameter
 params.outdir = "./results"
