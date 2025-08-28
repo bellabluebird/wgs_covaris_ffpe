@@ -7,7 +7,7 @@ process FASTP {
     // conda option 
     conda 'bioconda::fastp=0.23.4'
     // docker profile option; these are published biocontainers
-    container 'biocontainers/fastp:v0.20.1_cv1'
+    container 'community.wave.seqera.io/library/fastp:0.24.0--62c97b06e8447690'
     
     // input: paired fastq files
     input:
