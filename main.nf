@@ -13,8 +13,6 @@ include { MULTIQC } from './modules/multiqc.nf'
 
 // debugging process to test S3 access
 process DEBUG_S3_ACCESS {
-    tag "s3-debug"
-    
     output:
     stdout
     
