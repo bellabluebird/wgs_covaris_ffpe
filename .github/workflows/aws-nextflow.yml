@@ -165,7 +165,7 @@ jobs:
         run: |
           # show the exact command we're about to run
           echo "About to run this Nextflow command:"
-          echo "nextflow run main.nf -profile aws --input_dir \"${{ github.event.inputs.input_s3_path }}\" --outdir \"${{ github.event.inputs.output_s3_path }}\" -with-report nextflow_report.html -with-timeline timeline.html -with-dag flowchart.html"
+          echo "nextflow run main.nf -profile aws --input_dir \"${{ github.event.inputs.input_s3_path }}\" --outdir \"${{ github.event.inputs.output_s3_path }}\" --aws_region \"${{ github.event.inputs.aws_region }}\" -with-report nextflow_report.html -with-timeline timeline.html -with-dag flowchart.html"
           echo ""
           
           # run the main.nf file (pipeline) with these settings:
@@ -173,6 +173,7 @@ jobs:
             -profile aws \
             --input_dir "${{ github.event.inputs.input_s3_path }}" \
             --outdir "${{ github.event.inputs.output_s3_path }}" \
+            --aws_region "${{ github.event.inputs.aws_region }}" \
             -with-report nextflow_report.html \
             -with-timeline timeline.html \
             -with-dag flowchart.html
