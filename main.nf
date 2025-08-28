@@ -47,9 +47,6 @@ ch_input = Channel.of([
 
 // main workflow
 workflow {
-    // split input channel for parallel processing
-    ch_input.into { ch_fastqc; ch_fastp }
-    
     // raw fastqc
     fastqc_raw = FASTQC(ch_fastqc)
     
