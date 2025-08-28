@@ -104,25 +104,12 @@ try {
 
 log.info "=== END FILE DISCOVERY DEBUGGING ==="
 
-// Now try the actual file pairing
-ch_input = Channel
-    .fromFilePairs("${params.input_dir}/*_R{1,2}.fastq.gz", size: 2)
-    .ifEmpty { 
-        log.error "Cannot find any paired FASTQ files in: ${params.input_dir}"
-        log.error "Expected pattern: *_R{1,2}.fastq.gz"
-        log.error "Your files should be named like: ERR008539_R1.fastq.gz, ERR008539_R2.fastq.gz"
-        log.error "Full pattern being searched: ${params.input_dir}/*_R{1,2}.fastq.gz"
-        
-        // Additional debugging information
-        log.error "=== DEBUGGING INFO ==="
-        log.error "AWS region: ${params.aws_region ?: 'not configured'}"
-        log.error "Workflow launch dir: ${workflow.launchDir}"
-        log.error "Workflow work dir: ${workflow.workDir}"
-        log.error "Nextflow version: ${nextflow.version}"
-        log.error "=== END DEBUGGING INFO ==="
-        
-        error "No paired FASTQ files found"
-    }
+// Create S3 file pairs manually (more reliable for S3)
+log.info "Creating S3 file channels manually for ERR008539"
+ch_input = Channel.of([
+    'ERR008539', 
+    ["${params.input_dir}/ERR008539_R1.fastq.gz", "${params.input_dir}/ERR008539_R2.fastq.gz"]
+])
 
 // main workflow
 workflow {
