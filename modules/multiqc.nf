@@ -8,7 +8,7 @@ process MULTIQC {
     // conda option
     conda 'bioconda::multiqc=1.19'
     // docker profile option; these are published biocontainers
-    container 'quay.io/biocontainers/multiqc:1.19--pyhdfd78af_0'
+    container 'biocontainers/multiqc:v1.8_cv1'
     
     // path to file inputs
     input:

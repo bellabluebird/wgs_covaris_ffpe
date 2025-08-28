@@ -9,7 +9,7 @@ process FASTQC {
     // conda option
     conda 'bioconda::fastqc=0.12.1'
     // docker profile option; these are published biocontainers
-    container 'quay.io/biocontainers/fastqc:0.12.1--hdfd78af_0'
+    container 'biocontainers/fastqc:v0.11.9_cv8'
     
     // input: paired reads from fastp
     input:
