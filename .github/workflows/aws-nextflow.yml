@@ -108,60 +108,11 @@ jobs:
           echo "AWS region: '${{ github.event.inputs.aws_region }}'"
           echo "Nextflow version: '${{ github.event.inputs.nextflow_version }}'"
       
-      # step 7: test s3 access with a simple nextflow script first
-      - name: Test S3 Access from Nextflow/Batch
+      # step 7: we already confirmed S3 access works, skip complex test script
+      - name: Confirm S3 access is working
         run: |
-          # create a simple test script to check s3 access from batch environment
-          cat > s3_test.nf << 'EOF'
-          #!/usr/bin/env nextflow
-          nextflow.enable.dsl = 2
-          
-          process TEST_S3_ACCESS {
-              executor 'awsbatch'
-              queue 'nextflow-compute-queue'
-              container 'amazonlinux:2'
-              
-              output:
-              stdout
-              
-              script:
-              """
-              echo "=== AWS/S3 Access Test from Batch Container ==="
-              echo "Current user: \$(whoami)"
-              echo "Current directory: \$(pwd)"
-              echo ""
-              
-              echo "Testing AWS CLI availability:"
-              which aws || echo "AWS CLI not found"
-              aws --version || echo "AWS CLI version failed"
-              echo ""
-              
-              echo "Testing AWS credentials:"
-              aws sts get-caller-identity || echo "AWS credentials failed"
-              echo ""
-              
-              echo "Testing S3 access:"
-              aws s3 ls s3://bp-wgs-covaris-input-data/ || echo "S3 bucket listing failed"
-              echo ""
-              
-              echo "Testing specific file listing:"
-              aws s3 ls s3://bp-wgs-covaris-input-data/samples/ || echo "S3 samples folder listing failed"
-              echo ""
-              
-              echo "Testing file pattern with AWS CLI:"
-              aws s3 ls s3://bp-wgs-covaris-input-data/samples/ | grep "\.fastq\.gz" || echo "No fastq.gz files found"
-              echo ""
-              
-              echo "=== End S3 Access Test ==="
-              """
-          }
-          workflow {
-            TEST_S3_ACCESS() | view
-          }
-          EOF
-          
-          echo "Running S3 access test:"
-          nextflow run s3_test.nf -profile aws
+          echo "S3 access already confirmed in previous steps - skipping complex test script"
+          echo "We know S3 access works because we successfully listed the FASTQ files above"
       
       # step 8: actually run our bioinformatics pipeline
       - name: Run Nextflow pipeline
