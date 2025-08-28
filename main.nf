@@ -82,12 +82,6 @@ ch_input = Channel.of([
 
 // main workflow
 workflow {
-    // First, run S3 debugging process
-    DEBUG_S3_ACCESS() | view { "S3 DEBUG OUTPUT: $it" }
-    
-    // debug: show what files were found
-    ch_input.view { sample_id, files -> "Found sample: ${sample_id} with files: ${files}" }
-    
     // raw fastqc
     fastqc_raw = FASTQC(ch_input)
     
