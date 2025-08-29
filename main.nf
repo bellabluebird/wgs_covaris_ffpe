@@ -10,6 +10,7 @@ nextflow.enable.dsl = 2
 include { FASTQC } from './modules/fastqc.nf'
 include { FASTQC as FASTQC_TRIMMED } from './modules/fastqc.nf'
 include { FASTP } from './modules/fastp.nf'
+include { BWA_MEM2_INDEX } from './modules/bwa_mem2_index.nf'
 include { BWA_MEM2 } from './modules/bwa_mem2.nf'
 include { SAMTOOLS_STATS } from './modules/samtools_stats.nf'
 include { MULTIQC } from './modules/multiqc.nf'
@@ -47,11 +48,10 @@ ch_input = Channel.of([
     ["${params.input_dir}/ERR008539_R1.fastq.gz", "${params.input_dir}/ERR008539_R2.fastq.gz"]
 ])
 
-// create reference channel from input directory (collect FASTA and all BWA index files)
-ch_reference = Channel.fromPath([
-    "${params.input_dir}/*.fasta",
-    "${params.input_dir}/*.fasta.*"
-]).collect()
+// create reference channel from input directory (just FASTA for indexing)
+ch_reference_fasta = Channel.fromPath("${params.input_dir}/*.fasta")
+    .ifEmpty { error "No reference genome (.fasta) found in ${params.input_dir}" }
+    .first()
 
 // main workflow
 workflow {
@@ -64,8 +64,14 @@ workflow {
     // post-trim fastqc on cleaned reads
     fastqc_trimmed = FASTQC_TRIMMED(fastp_results.reads)
     
+    // create BWA-MEM2 index from reference
+    bwa_index = BWA_MEM2_INDEX(ch_reference_fasta)
+    
+    // combine indexed reference files for alignment
+    ch_reference_indexed = bwa_index.fasta.mix(bwa_index.index).collect()
+    
     // alignment to reference genome
-    bwa_results = BWA_MEM2(fastp_results.reads, ch_reference)
+    bwa_results = BWA_MEM2(fastp_results.reads, ch_reference_indexed)
     
     // alignment statistics
     samtools_stats = SAMTOOLS_STATS(bwa_results.bam)

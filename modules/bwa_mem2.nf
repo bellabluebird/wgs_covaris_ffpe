@@ -10,7 +10,7 @@ process BWA_MEM2 {
     // input: paired trimmed reads from fastp
     input:
     tuple val(sample_id), path(reads)
-    path reference
+    path reference_files
     
     // output: sorted BAM file and index
     output:
@@ -18,7 +18,7 @@ process BWA_MEM2 {
     tuple val(sample_id), path("${sample_id}.sorted.bam.bai"), emit: bai
     
     script:
-    def ref_fasta = reference.find { it.toString().endsWith('.fasta') }
+    def ref_fasta = reference_files.find { it.toString().endsWith('.fasta') }
     """
     # align reads to reference genome and sort
     bwa-mem2 mem \\
