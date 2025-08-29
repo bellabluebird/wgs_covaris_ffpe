@@ -57,11 +57,11 @@ workflow {
     fastqc_trimmed = FASTQC_TRIMMED(fastp_results.reads)
     
     // collect all reports for multiqc
-    multiqc_input = fastqc_raw.zip
-        .mix(fastqc_trimmed.zip)
-        .mix(fastp_results.json)
-        .collect()
-    
+    multiqc_input = fastqc_raw.map { id, file -> file }
+    .mix(fastqc_trimmed.map { id, file -> file })
+    .mix(fastp_results.json)
+    .collect()
+
     // multiqc report
     MULTIQC(multiqc_input)
 }
