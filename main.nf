@@ -35,12 +35,12 @@ log.info "AWS region from config: ${params.aws_region ?: 'not set'}"
 log.info "Current working directory: ${workflow.launchDir}"
 log.info "Work directory: ${workflow.workDir}"
 
-// Using the current pattern
+// using the current pattern
 log.info "Using fromFilePairs with pattern *_R{1,2}.fastq.gz"
 def pattern1 = "${params.input_dir}/*_R{1,2}.fastq.gz"
 log.info "Full pattern: ${pattern1}"
 
-// Create S3 file pairs manually
+// create S3 file pairs manually
 log.info "Creating S3 file channels manually for ERR008539"
 ch_input = Channel.of([
     'ERR008539', 
