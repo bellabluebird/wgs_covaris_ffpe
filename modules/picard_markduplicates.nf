@@ -22,14 +22,16 @@ process PICARD_MARKDUPLICATES {
     # create tmp directory if it doesn't exist
     mkdir -p tmp
     
-    # mark duplicates with Picard using BUILD_INDEX instead of CREATE_INDEX
-    picard MarkDuplicates \\
+    # mark duplicates with Picard (without indexing)
+    java -jar /usr/local/share/picard-*/picard.jar MarkDuplicates \\
         INPUT=${bam} \\
         OUTPUT=${sample_id}.marked.bam \\
         METRICS_FILE=${sample_id}.marked_dup_metrics.txt \\
-        BUILD_INDEX=true \\
         VALIDATION_STRINGENCY=SILENT \\
         TMP_DIR=\$PWD/tmp
+    
+    # create index with samtools (more reliable in mulled container)
+    samtools index ${sample_id}.marked.bam
     
     # verify that both output files were created
     if [[ ! -f "${sample_id}.marked.bam" ]]; then
