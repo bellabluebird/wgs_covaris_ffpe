@@ -19,6 +19,9 @@ process PICARD_MARKDUPLICATES {
     
     script:
     """
+    # create tmp directory if it doesn't exist
+    mkdir -p tmp
+    
     # mark duplicates with Picard
     picard MarkDuplicates \\
         INPUT=${bam} \\
@@ -27,8 +30,5 @@ process PICARD_MARKDUPLICATES {
         CREATE_INDEX=true \\
         VALIDATION_STRINGENCY=SILENT \\
         TMP_DIR=\$PWD/tmp
-    
-    # create tmp directory if it doesn't exist
-    mkdir -p tmp
     """
 }
