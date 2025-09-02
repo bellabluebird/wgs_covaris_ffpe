@@ -16,8 +16,8 @@ include { SAMTOOLS_STATS } from './modules/samtools_stats.nf'
 // new modules i'm working on implementing - uncomment when ready
 include { QUALIMAP } from './modules/qualimap.nf'
 include { PICARD_MARKDUPLICATES } from './modules/picard_markduplicates.nf'
-// include { PICARD_COLLECTINSERTSIZEMETRICS } from './modules/picard_insert_size.nf'
-// include { MOSDEPTH } from './modules/mosdepth.nf'
+include { PICARD_COLLECTINSERTSIZEMETRICS } from './modules/picard_insert_size.nf'
+include { MOSDEPTH } from './modules/mosdepth.nf'
 // include { GATK_BASERECALIBRATOR } from './modules/gatk_baserecalibrator.nf'
 // include { GATK_APPLYBQSR } from './modules/gatk_applybqsr.nf'
 // include { GATK_HAPLOTYPECALLER } from './modules/gatk_haplotypecaller.nf'
@@ -92,8 +92,14 @@ workflow {
     // mark duplicates
     markduplicates_results = PICARD_MARKDUPLICATES(bwa_results.bam)
     
-    // quality metrics with Qualimap (on duplicate-marked BAM)
+    // insert size metrics (on duplicate-marked BAM)
+    insert_size_metrics = PICARD_COLLECTINSERTSIZEMETRICS(markduplicates_results.bam)
+    
+    // coverage analysis with mosdepth (on duplicate-marked BAM)
     ch_marked_bam_bai = markduplicates_results.bam.join(markduplicates_results.bai)
+    coverage_results = MOSDEPTH(ch_marked_bam_bai)
+    
+    // quality metrics with Qualimap (on duplicate-marked BAM)
     qualimap_results = QUALIMAP(ch_marked_bam_bai)
 
     // collect all reports for multiqc
@@ -102,6 +108,8 @@ workflow {
     .mix(fastp_results.json.map { id, file -> file })
     .mix(samtools_stats.stats.map { id, file -> file })
     .mix(markduplicates_results.metrics.map { id, file -> file })
+    .mix(insert_size_metrics.metrics.map { id, file -> file })
+    .mix(coverage_results.summary.map { id, file -> file })
     .mix(qualimap_results.genome_results.map { id, file -> file })
     .collect()
 
