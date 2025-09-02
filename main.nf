@@ -18,8 +18,8 @@ include { QUALIMAP } from './modules/qualimap.nf'
 include { PICARD_MARKDUPLICATES } from './modules/picard_markduplicates.nf'
 include { PICARD_COLLECTINSERTSIZEMETRICS } from './modules/picard_insert_size.nf'
 include { MOSDEPTH } from './modules/mosdepth.nf'
-// include { GATK_BASERECALIBRATOR } from './modules/gatk_baserecalibrator.nf'
-// include { GATK_APPLYBQSR } from './modules/gatk_applybqsr.nf'
+include { GATK_BASERECALIBRATOR } from './modules/gatk_baserecalibrator.nf'
+include { GATK_APPLYBQSR } from './modules/gatk_applybqsr.nf'
 // include { GATK_HAPLOTYPECALLER } from './modules/gatk_haplotypecaller.nf'
 // include { BCFTOOLS_STATS } from './modules/bcftools_stats.nf'
 include { MULTIQC } from './modules/multiqc.nf'
@@ -28,8 +28,8 @@ include { MULTIQC } from './modules/multiqc.nf'
 // input_dir comes from command line --input_dir parameter
 params.outdir = "./results"
 params.publish_mode = 'copy'
-// need a new param for bqsr known sites
-// params.known_sites = null
+// BQSR known sites parameter (optional - comma-separated list of VCF files)
+params.known_sites = null  // e.g., --known_sites "dbsnp.vcf.gz,1000G.vcf.gz,Mills_indels.vcf.gz"
 
 // input validation with debugging
 log.info "DEBUG: Received input_dir parameter: '${params.input_dir}'"
@@ -64,7 +64,11 @@ ch_reference_fasta = Channel.fromPath("${params.input_dir}/*.fasta")
     .ifEmpty { error "No reference genome (.fasta) found in ${params.input_dir}" }
     .first()
 
-// new channel for bsqr known sites 
+// create known sites channel for BQSR (optional)
+ch_known_sites = params.known_sites ? 
+    Channel.fromPath(params.known_sites.split(',').collect { it.trim() })
+        .collect() : 
+    Channel.empty() 
 
 // main workflow
 workflow {
@@ -99,8 +103,23 @@ workflow {
     ch_marked_bam_bai = markduplicates_results.bam.join(markduplicates_results.bai)
     coverage_results = MOSDEPTH(ch_marked_bam_bai)
     
-    // quality metrics with Qualimap (on duplicate-marked BAM)
-    qualimap_results = QUALIMAP(ch_marked_bam_bai)
+    // base quality score recalibration (optional if known sites provided)
+    if (params.known_sites) {
+        // generate recalibration table
+        bqsr_table = GATK_BASERECALIBRATOR(ch_marked_bam_bai, ch_reference_indexed, ch_known_sites)
+        
+        // apply BQSR to get recalibrated BAM
+        bqsr_results = GATK_APPLYBQSR(ch_marked_bam_bai, ch_reference_indexed, bqsr_table.recal_table)
+        
+        // use recalibrated BAM for quality metrics
+        ch_final_bam_bai = bqsr_results.bam.join(bqsr_results.bai)
+    } else {
+        // use marked duplicates BAM for quality metrics if no known sites
+        ch_final_bam_bai = ch_marked_bam_bai
+    }
+    
+    // quality metrics with Qualimap (on final BAM - either BQSR'd or duplicate-marked)
+    qualimap_results = QUALIMAP(ch_final_bam_bai)
 
     // collect all reports for multiqc
     multiqc_input = fastqc_raw.zip.map { id, file -> file }
