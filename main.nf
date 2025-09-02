@@ -15,7 +15,7 @@ include { BWA_MEM2 } from './modules/bwa_mem2.nf'
 include { SAMTOOLS_STATS } from './modules/samtools_stats.nf'
 // new modules i'm working on implementing - uncomment when ready
 include { QUALIMAP } from './modules/qualimap.nf'
-// include { PICARD_MARKDUPLICATES } from './modules/picard_markduplicates.nf'
+include { PICARD_MARKDUPLICATES } from './modules/picard_markduplicates.nf'
 // include { PICARD_COLLECTINSERTSIZEMETRICS } from './modules/picard_insert_size.nf'
 // include { MOSDEPTH } from './modules/mosdepth.nf'
 // include { GATK_BASERECALIBRATOR } from './modules/gatk_baserecalibrator.nf'
@@ -89,15 +89,19 @@ workflow {
     // alignment statistics
     samtools_stats = SAMTOOLS_STATS(bwa_results.bam)
     
-    // quality metrics with Qualimap
-    ch_bam_bai = bwa_results.bam.join(bwa_results.bai)
-    qualimap_results = QUALIMAP(ch_bam_bai)
+    // mark duplicates
+    markduplicates_results = PICARD_MARKDUPLICATES(bwa_results.bam)
+    
+    // quality metrics with Qualimap (on duplicate-marked BAM)
+    ch_marked_bam_bai = markduplicates_results.bam.join(markduplicates_results.bai)
+    qualimap_results = QUALIMAP(ch_marked_bam_bai)
 
     // collect all reports for multiqc
     multiqc_input = fastqc_raw.zip.map { id, file -> file }
     .mix(fastqc_trimmed.zip.map { id, file -> file })
     .mix(fastp_results.json.map { id, file -> file })
     .mix(samtools_stats.stats.map { id, file -> file })
+    .mix(markduplicates_results.metrics.map { id, file -> file })
     .mix(qualimap_results.genome_results.map { id, file -> file })
     .collect()
 
