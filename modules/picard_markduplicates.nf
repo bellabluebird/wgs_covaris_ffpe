@@ -22,13 +22,27 @@ process PICARD_MARKDUPLICATES {
     # create tmp directory if it doesn't exist
     mkdir -p tmp
     
-    # mark duplicates with Picard
+    # mark duplicates with Picard using BUILD_INDEX instead of CREATE_INDEX
     picard MarkDuplicates \\
         INPUT=${bam} \\
         OUTPUT=${sample_id}.marked.bam \\
         METRICS_FILE=${sample_id}.marked_dup_metrics.txt \\
-        CREATE_INDEX=true \\
+        BUILD_INDEX=true \\
         VALIDATION_STRINGENCY=SILENT \\
         TMP_DIR=\$PWD/tmp
+    
+    # verify that both output files were created
+    if [[ ! -f "${sample_id}.marked.bam" ]]; then
+        echo "ERROR: BAM file ${sample_id}.marked.bam was not created"
+        exit 1
+    fi
+    
+    if [[ ! -f "${sample_id}.marked.bam.bai" ]]; then
+        echo "ERROR: Index file ${sample_id}.marked.bam.bai was not created"
+        exit 1
+    fi
+    
+    echo "SUCCESS: Both BAM and index files created successfully"
+    ls -la ${sample_id}.marked.bam*
     """
 }
