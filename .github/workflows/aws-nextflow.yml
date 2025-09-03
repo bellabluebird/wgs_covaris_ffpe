@@ -74,14 +74,28 @@ jobs:
 
       - name: Debug S3 input files
         run: |
-          echo "Listing contents of input S3 bucket:"
-          aws s3 ls ${{ github.event.inputs.input_s3_path }}/ --recursive
-          echo ""
-          echo "Looking specifically for fastq.gz files:"
-          aws s3 ls ${{ github.event.inputs.input_s3_path }}/ --recursive | grep "\.fastq\.gz" || true
-          echo ""
-          echo "Total file count:"
-          aws s3 ls ${{ github.event.inputs.input_s3_path }}/ --recursive | wc -l
+          echo "Listing contents of input S3 bucket: ${{ github.event.inputs.input_s3_path }}"
+          
+          # Check if it's a public AWS bucket requiring anonymous access
+          if [[ "${{ github.event.inputs.input_s3_path }}" == *"gatk-test-data"* ]] || [[ "${{ github.event.inputs.input_s3_path }}" == *"broad-references"* ]]; then
+            echo "Detected public AWS dataset - using anonymous access (--no-sign-request)"
+            aws s3 ls ${{ github.event.inputs.input_s3_path }}/ --recursive --no-sign-request
+            echo ""
+            echo "Looking specifically for fastq files:"
+            aws s3 ls ${{ github.event.inputs.input_s3_path }}/ --recursive --no-sign-request | grep -E "\.(fastq|fq)" || echo "No FASTQ files found"
+            echo ""
+            echo "Total file count:"
+            aws s3 ls ${{ github.event.inputs.input_s3_path }}/ --recursive --no-sign-request | wc -l
+          else
+            echo "Using authenticated access for private bucket"
+            aws s3 ls ${{ github.event.inputs.input_s3_path }}/ --recursive
+            echo ""
+            echo "Looking specifically for fastq files:"
+            aws s3 ls ${{ github.event.inputs.input_s3_path }}/ --recursive | grep -E "\.(fastq|fq)\.?g?z?$" || echo "No FASTQ files found"
+            echo ""
+            echo "Total file count:"
+            aws s3 ls ${{ github.event.inputs.input_s3_path }}/ --recursive | wc -l
+          fi
 
       - name: Debug Nextflow parameters
         run: |
