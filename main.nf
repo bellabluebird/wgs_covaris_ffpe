@@ -1,7 +1,8 @@
 #!/usr/bin/env nextflow
 
-// basic qc pipeline
-// BP MAKE alterations to handle 30x sequencing, this will only work on paired-end reads
+// WGS Quality Control & Analysis Pipeline with BQSR
+// Requires: --input_dir, --known_sites
+// Example: nextflow run main.nf --input_dir "s3://bucket/samples" --known_sites "s3://bucket/dbsnp.vcf.gz,s3://bucket/mills.vcf.gz"
 
 // enable modular functions
 nextflow.enable.dsl = 2
@@ -30,8 +31,9 @@ include { MULTIQC } from './modules/multiqc.nf'
 // input_dir comes from command line --input_dir parameter
 params.outdir = "./results"
 params.publish_mode = 'copy'
-// BQSR known sites parameter (optional - comma-separated list of VCF files)
-params.known_sites = null  // e.g., --known_sites "dbsnp.vcf.gz,1000G.vcf.gz,Mills_indels.vcf.gz"
+// BQSR known sites parameter (required - comma-separated list of VCF files)
+// Example: --known_sites "s3://bucket/dbsnp_138.hg38.vcf.gz,s3://bucket/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz"
+params.known_sites = null
 
 // input validation with debugging
 log.info "DEBUG: Received input_dir parameter: '${params.input_dir}'"
@@ -40,6 +42,10 @@ log.info "DEBUG: Parameter length: ${params.input_dir?.length()}"
 
 if (!params.input_dir) {
     error "Please provide input directory with --input_dir (received: '${params.input_dir}')"
+}
+
+if (!params.known_sites) {
+    error "Please provide known sites VCF files with --known_sites (required for BQSR)"
 }
 
 // creating input channel from paired fastq files with extensive debugging
@@ -66,11 +72,10 @@ ch_reference_fasta = Channel.fromPath("${params.input_dir}/*.fasta")
     .ifEmpty { error "No reference genome (.fasta) found in ${params.input_dir}" }
     .first()
 
-// create known sites channel for BQSR (optional)
-ch_known_sites = params.known_sites ? 
-    Channel.fromPath(params.known_sites.split(',').collect { it.trim() })
-        .collect() : 
-    Channel.empty() 
+// create known sites channel for BQSR
+ch_known_sites = Channel.fromPath(params.known_sites.split(',').collect { it.trim() })
+    .ifEmpty { error "No known sites VCF files found at specified paths" }
+    .collect() 
 
 // main workflow
 workflow {
@@ -110,23 +115,14 @@ workflow {
     // coverage analysis with mosdepth (on duplicate-marked indexed BAM)
     coverage_results = MOSDEPTH(samtools_index_marked.bam_bai)
     
-    // base quality score recalibration (optional if known sites provided)
-    if (params.known_sites) {
-        // generate recalibration table
-        bqsr_table = GATK_BASERECALIBRATOR(samtools_index_marked.bam_bai, ch_reference_indexed, ch_known_sites)
-        
-        // apply BQSR to get recalibrated BAM
-        bqsr_results = GATK_APPLYBQSR(samtools_index_marked.bam_bai, ch_reference_indexed, bqsr_table.recal_table)
-        
-        // use recalibrated BAM for quality metrics
-        ch_final_bam_bai = bqsr_results.bam.join(bqsr_results.bai)
-    } else {
-        // use marked duplicates BAM for quality metrics if no known sites
-        ch_final_bam_bai = samtools_index_marked.bam_bai
-    }
+    // base quality score recalibration with GATK
+    bqsr_table = GATK_BASERECALIBRATOR(samtools_index_marked.bam_bai, ch_reference_indexed, ch_known_sites)
     
-    // quality metrics with Qualimap (on final BAM - either BQSR'd or duplicate-marked)
-    qualimap_results = QUALIMAP(ch_final_bam_bai)
+    // apply BQSR to get recalibrated BAM
+    bqsr_results = GATK_APPLYBQSR(samtools_index_marked.bam_bai, ch_reference_indexed, bqsr_table.recal_table)
+    
+    // quality metrics with Qualimap (on recalibrated BAM)
+    qualimap_results = QUALIMAP(bqsr_results.bam.join(bqsr_results.bai))
 
     // collect all reports for multiqc
     multiqc_input = fastqc_raw.zip.map { id, file -> file }
