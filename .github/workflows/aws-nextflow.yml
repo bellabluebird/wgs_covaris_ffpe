@@ -3,10 +3,28 @@ name: Run Nextflow Pipeline on AWS
 on:
   workflow_dispatch:
     inputs:
+      profile:
+        description: 'Nextflow profile to use (gatk_test, hg19, hg38, custom)'
+        required: true
+        default: 'hg19'
+        type: choice
+        options:
+        - gatk_test
+        - hg19
+        - hg38
+        - custom
       input_s3_path:
-        description: 'S3 path to input FASTQ files'
+        description: 'S3 path to input FASTQ files (samples only)'
         required: true
         default: 's3://bp-wgs-covaris-input-data/samples'
+      reference_s3_path:
+        description: 'S3 path to reference FASTA (required if profile=custom)'
+        required: false
+        default: ''
+      known_sites:
+        description: 'Comma-separated S3 paths to known sites VCF files (required if profile=custom)'
+        required: false
+        default: ''
       output_s3_path:
         description: 'S3 path for results'
         required: true
@@ -56,18 +74,35 @@ jobs:
 
       - name: Debug S3 input files
         run: |
-          echo "Listing contents of input S3 bucket:"
-          aws s3 ls ${{ github.event.inputs.input_s3_path }}/ --recursive
-          echo ""
-          echo "Looking specifically for fastq.gz files:"
-          aws s3 ls ${{ github.event.inputs.input_s3_path }}/ --recursive | grep "\.fastq\.gz" || true
-          echo ""
-          echo "Total file count:"
-          aws s3 ls ${{ github.event.inputs.input_s3_path }}/ --recursive | wc -l
+          echo "Listing contents of input S3 bucket: ${{ github.event.inputs.input_s3_path }}"
+          
+          # Check if it's a public AWS bucket requiring anonymous access
+          if [[ "${{ github.event.inputs.input_s3_path }}" == *"gatk-test-data"* ]] || [[ "${{ github.event.inputs.input_s3_path }}" == *"broad-references"* ]]; then
+            echo "Detected public AWS dataset - using anonymous access (--no-sign-request)"
+            aws s3 ls ${{ github.event.inputs.input_s3_path }}/ --recursive --no-sign-request
+            echo ""
+            echo "Looking specifically for fastq files:"
+            aws s3 ls ${{ github.event.inputs.input_s3_path }}/ --recursive --no-sign-request | grep -E "\.(fastq|fq)" || echo "No FASTQ files found"
+            echo ""
+            echo "Total file count:"
+            aws s3 ls ${{ github.event.inputs.input_s3_path }}/ --recursive --no-sign-request | wc -l
+          else
+            echo "Using authenticated access for private bucket"
+            aws s3 ls ${{ github.event.inputs.input_s3_path }}/ --recursive
+            echo ""
+            echo "Looking specifically for fastq files:"
+            aws s3 ls ${{ github.event.inputs.input_s3_path }}/ --recursive | grep -E "\.(fastq|fq)\.?g?z?$" || echo "No FASTQ files found"
+            echo ""
+            echo "Total file count:"
+            aws s3 ls ${{ github.event.inputs.input_s3_path }}/ --recursive | wc -l
+          fi
 
       - name: Debug Nextflow parameters
         run: |
+          echo "Profile: '${{ github.event.inputs.profile }}'"
           echo "Input S3 path: '${{ github.event.inputs.input_s3_path }}'"
+          echo "Reference S3 path: '${{ github.event.inputs.reference_s3_path }}'"
+          echo "Known sites: '${{ github.event.inputs.known_sites }}'"
           echo "Output S3 path: '${{ github.event.inputs.output_s3_path }}'"
           echo "AWS region: '${{ github.event.inputs.aws_region }}'"
           echo "Nextflow version: '${{ github.event.inputs.nextflow_version }}'"
@@ -80,21 +115,44 @@ jobs:
       - name: Export Seqera/Tower Token
         run: echo "TOWER_ACCESS_TOKEN=${{ secrets.TOWER_ACCESS_TOKEN }}" >> $GITHUB_ENV
 
+      - name: Build Nextflow command
+        id: build_cmd
+        run: |
+          # Base command with profile
+          BASE_CMD="nextflow run main.nf -profile aws,${{ github.event.inputs.profile }}"
+          
+          # Always add input_dir and outdir
+          BASE_CMD="$BASE_CMD --input_dir \"${{ github.event.inputs.input_s3_path }}\""
+          BASE_CMD="$BASE_CMD --outdir \"${{ github.event.inputs.output_s3_path }}\""
+          BASE_CMD="$BASE_CMD --aws_region \"${{ github.event.inputs.aws_region }}\""
+          
+          # Add reference and known_sites if profile is custom
+          if [[ "${{ github.event.inputs.profile }}" == "custom" ]]; then
+            if [[ -z "${{ github.event.inputs.reference_s3_path }}" ]]; then
+              echo "ERROR: reference_s3_path is required when using custom profile"
+              exit 1
+            fi
+            if [[ -z "${{ github.event.inputs.known_sites }}" ]]; then
+              echo "ERROR: known_sites is required when using custom profile"
+              exit 1
+            fi
+            BASE_CMD="$BASE_CMD --reference \"${{ github.event.inputs.reference_s3_path }}\""
+            BASE_CMD="$BASE_CMD --known_sites \"${{ github.event.inputs.known_sites }}\""
+          fi
+          
+          # Add reporting options
+          FULL_CMD="$BASE_CMD -with-report nextflow_report.html -with-timeline timeline.html -with-dag flowchart.html -with-fusion"
+          
+          echo "NEXTFLOW_CMD=$FULL_CMD" >> $GITHUB_OUTPUT
+          echo "Built command: $FULL_CMD"
+
       - name: Run Nextflow pipeline (with Fusion)
         run: |
-          echo "About to run this Nextflow command with Fusion enabled:"
-          echo "nextflow run main.nf -profile aws --input_dir \"${{ github.event.inputs.input_s3_path }}\" --outdir \"${{ github.event.inputs.output_s3_path }}\" --aws_region \"${{ github.event.inputs.aws_region }}\" -with-report nextflow_report.html -with-timeline timeline.html -with-dag flowchart.html -with-fusion"
+          echo "About to run Nextflow command:"
+          echo "${{ steps.build_cmd.outputs.NEXTFLOW_CMD }}"
           echo ""
           
-          nextflow run main.nf \
-            -profile aws \
-            --input_dir "${{ github.event.inputs.input_s3_path }}" \
-            --outdir "${{ github.event.inputs.output_s3_path }}" \
-            --aws_region "${{ github.event.inputs.aws_region }}" \
-            -with-report nextflow_report.html \
-            -with-timeline timeline.html \
-            -with-dag flowchart.html \
-            -with-fusion
+          ${{ steps.build_cmd.outputs.NEXTFLOW_CMD }}
 
       - name: Upload Nextflow reports
         if: always()
