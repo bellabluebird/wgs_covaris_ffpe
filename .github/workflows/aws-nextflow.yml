@@ -4,26 +4,23 @@ on:
   workflow_dispatch:
     inputs:
       profile:
-        description: 'Nextflow profile to use (gatk_test, hg19, hg38, custom)'
+        description: 'Nextflow profile to use (only custom available)'
         required: true
-        default: 'hg19'
+        default: 'custom'
         type: choice
         options:
-        - gatk_test
-        - hg19
-        - hg38
         - custom
       input_s3_path:
         description: 'S3 path to input FASTQ files (samples only)'
         required: true
         default: 's3://bp-wgs-covaris-input-data/samples'
       reference_s3_path:
-        description: 'S3 path to reference FASTA (required if profile=custom)'
-        required: false
-        default: ''
+        description: 'S3 path to reference FASTA'
+        required: true
+        default: 's3://bp-wgs-covaris-input-data/reference/'
       known_sites:
-        description: 'Comma-separated S3 paths to known sites VCF files (required if profile=custom)'
-        required: false
+        description: 'Comma-separated S3 paths to known sites VCF files'
+        required: true
         default: ''
       output_s3_path:
         description: 'S3 path for results'
@@ -32,6 +29,7 @@ on:
       aws_region:
         description: 'AWS region (e.g., us-east-1, us-east-2, eu-west-1)'
         required: true
+        default: 'us-east-2'
       nextflow_version:
         description: 'Nextflow version to use'
         required: false
@@ -126,19 +124,9 @@ jobs:
           BASE_CMD="$BASE_CMD --outdir \"${{ github.event.inputs.output_s3_path }}\""
           BASE_CMD="$BASE_CMD --aws_region \"${{ github.event.inputs.aws_region }}\""
           
-          # Add reference and known_sites if profile is custom
-          if [[ "${{ github.event.inputs.profile }}" == "custom" ]]; then
-            if [[ -z "${{ github.event.inputs.reference_s3_path }}" ]]; then
-              echo "ERROR: reference_s3_path is required when using custom profile"
-              exit 1
-            fi
-            if [[ -z "${{ github.event.inputs.known_sites }}" ]]; then
-              echo "ERROR: known_sites is required when using custom profile"
-              exit 1
-            fi
-            BASE_CMD="$BASE_CMD --reference \"${{ github.event.inputs.reference_s3_path }}\""
-            BASE_CMD="$BASE_CMD --known_sites \"${{ github.event.inputs.known_sites }}\""
-          fi
+          # Add required reference and known_sites parameters
+          BASE_CMD="$BASE_CMD --reference \"${{ github.event.inputs.reference_s3_path }}\""
+          BASE_CMD="$BASE_CMD --known_sites \"${{ github.event.inputs.known_sites }}\""
           
           # Add reporting options
           FULL_CMD="$BASE_CMD -with-report nextflow_report.html -with-timeline timeline.html -with-dag flowchart.html -with-fusion"
