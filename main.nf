@@ -14,6 +14,7 @@ include { BWA_MEM2_INDEX } from './modules/bwa_mem2_index.nf'
 include { BWA_MEM2 } from './modules/bwa_mem2.nf'
 include { SAMTOOLS_STATS } from './modules/samtools_stats.nf'
 include { SAMTOOLS_INDEX } from './modules/samtools_index.nf'
+include { SAMTOOLS_INDEX as SAMTOOLS_INDEX_MARKED } from './modules/samtools_index.nf'
 // new modules i'm working on implementing - uncomment when ready
 include { QUALIMAP } from './modules/qualimap.nf'
 include { PICARD_MARKDUPLICATES } from './modules/picard_markduplicates.nf'
@@ -100,26 +101,28 @@ workflow {
     // mark duplicates (using indexed BAM)
     markduplicates_results = PICARD_MARKDUPLICATES(samtools_index.bam_bai)
     
+    // index the marked BAM files
+    samtools_index_marked = SAMTOOLS_INDEX_MARKED(markduplicates_results.bam)
+    
     // insert size metrics (on duplicate-marked BAM)
     insert_size_metrics = PICARD_COLLECTINSERTSIZEMETRICS(markduplicates_results.bam)
     
-    // coverage analysis with mosdepth (on duplicate-marked BAM)
-    ch_marked_bam_bai = markduplicates_results.bam.join(markduplicates_results.bai)
-    coverage_results = MOSDEPTH(ch_marked_bam_bai)
+    // coverage analysis with mosdepth (on duplicate-marked indexed BAM)
+    coverage_results = MOSDEPTH(samtools_index_marked.bam_bai)
     
     // base quality score recalibration (optional if known sites provided)
     if (params.known_sites) {
         // generate recalibration table
-        bqsr_table = GATK_BASERECALIBRATOR(ch_marked_bam_bai, ch_reference_indexed, ch_known_sites)
+        bqsr_table = GATK_BASERECALIBRATOR(samtools_index_marked.bam_bai, ch_reference_indexed, ch_known_sites)
         
         // apply BQSR to get recalibrated BAM
-        bqsr_results = GATK_APPLYBQSR(ch_marked_bam_bai, ch_reference_indexed, bqsr_table.recal_table)
+        bqsr_results = GATK_APPLYBQSR(samtools_index_marked.bam_bai, ch_reference_indexed, bqsr_table.recal_table)
         
         // use recalibrated BAM for quality metrics
         ch_final_bam_bai = bqsr_results.bam.join(bqsr_results.bai)
     } else {
         // use marked duplicates BAM for quality metrics if no known sites
-        ch_final_bam_bai = ch_marked_bam_bai
+        ch_final_bam_bai = samtools_index_marked.bam_bai
     }
     
     // quality metrics with Qualimap (on final BAM - either BQSR'd or duplicate-marked)

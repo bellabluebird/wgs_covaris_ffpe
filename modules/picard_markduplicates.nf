@@ -3,10 +3,10 @@ process PICARD_MARKDUPLICATES {
     tag "$sample_id"
     publishDir "${params.outdir}/markduplicates", mode: params.publish_mode
     
-    container 'quay.io/biocontainers/picard:2.27.4--hdfd78af_0'
+    conda 'bioconda::picard=2.27.4'
 
     input:
-    tuple val(sample_id), path(bam)
+    tuple val(sample_id), path(bam), path(bai)
 
     output:
     tuple val(sample_id), path("${sample_id}.marked.bam"), emit: bam
