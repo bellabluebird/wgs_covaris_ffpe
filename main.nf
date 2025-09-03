@@ -13,6 +13,7 @@ include { FASTP } from './modules/fastp.nf'
 include { BWA_MEM2_INDEX } from './modules/bwa_mem2_index.nf'
 include { BWA_MEM2 } from './modules/bwa_mem2.nf'
 include { SAMTOOLS_STATS } from './modules/samtools_stats.nf'
+include { SAMTOOLS_INDEX } from './modules/samtools_index.nf'
 // new modules i'm working on implementing - uncomment when ready
 include { QUALIMAP } from './modules/qualimap.nf'
 include { PICARD_MARKDUPLICATES } from './modules/picard_markduplicates.nf'
@@ -93,8 +94,11 @@ workflow {
     // alignment statistics
     samtools_stats = SAMTOOLS_STATS(bwa_results.bam)
     
-    // mark duplicates
-    markduplicates_results = PICARD_MARKDUPLICATES(bwa_results.bam)
+    // index aligned BAM files
+    samtools_index = SAMTOOLS_INDEX(bwa_results.bam)
+    
+    // mark duplicates (using indexed BAM)
+    markduplicates_results = PICARD_MARKDUPLICATES(samtools_index.bam_bai)
     
     // insert size metrics (on duplicate-marked BAM)
     insert_size_metrics = PICARD_COLLECTINSERTSIZEMETRICS(markduplicates_results.bam)
