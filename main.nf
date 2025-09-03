@@ -1,8 +1,7 @@
 #!/usr/bin/env nextflow
 
 // WGS Quality Control & Analysis Pipeline with BQSR
-// Requires: --input_dir, --known_sites
-// Example: nextflow run main.nf --input_dir "s3://bucket/samples" --known_sites "s3://bucket/dbsnp.vcf.gz,s3://bucket/mills.vcf.gz"
+// Requires: --input_dir, --reference, --known_sites
 
 // enable modular functions
 nextflow.enable.dsl = 2
@@ -16,7 +15,6 @@ include { BWA_MEM2 } from './modules/bwa_mem2.nf'
 include { SAMTOOLS_STATS } from './modules/samtools_stats.nf'
 include { SAMTOOLS_INDEX } from './modules/samtools_index.nf'
 include { SAMTOOLS_INDEX as SAMTOOLS_INDEX_MARKED } from './modules/samtools_index.nf'
-// new modules i'm working on implementing - uncomment when ready
 include { QUALIMAP } from './modules/qualimap.nf'
 include { PICARD_MARKDUPLICATES } from './modules/picard_markduplicates.nf'
 include { PICARD_COLLECTINSERTSIZEMETRICS } from './modules/picard_insert_size.nf'
@@ -27,50 +25,39 @@ include { GATK_APPLYBQSR } from './modules/gatk_applybqsr.nf'
 // include { BCFTOOLS_STATS } from './modules/bcftools_stats.nf'
 include { MULTIQC } from './modules/multiqc.nf'
 
-// parameters
-// input_dir comes from command line --input_dir parameter
+// parameters - all data-specific parameters must be provided explicitly
 params.outdir = "./results"
 params.publish_mode = 'copy'
-// BQSR known sites parameter (required - comma-separated list of VCF files)
-// Example: --known_sites "s3://bucket/dbsnp_138.hg38.vcf.gz,s3://bucket/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz"
+
+// required parameters (no defaults - must be specified via CLI or profile)
+params.input_dir = null
+params.reference = null
 params.known_sites = null
 
-// input validation with debugging
-log.info "DEBUG: Received input_dir parameter: '${params.input_dir}'"
-log.info "DEBUG: Parameter type: ${params.input_dir?.getClass()}"
-log.info "DEBUG: Parameter length: ${params.input_dir?.length()}"
+// input validation
+log.info "Input directory: ${params.input_dir}"
+log.info "Reference genome: ${params.reference}"
+log.info "Known sites: ${params.known_sites}"
 
 if (!params.input_dir) {
-    error "Please provide input directory with --input_dir (received: '${params.input_dir}')"
+    error "Please provide input directory with --input_dir"
+}
+
+if (!params.reference) {
+    error "Please provide reference genome with --reference"
 }
 
 if (!params.known_sites) {
     error "Please provide known sites VCF files with --known_sites (required for BQSR)"
 }
 
-// creating input channel from paired fastq files with extensive debugging
-log.info "=== FILE DISCOVERY DEBUGGING ==="
-log.info "Input directory: ${params.input_dir}"
-log.info "AWS region from config: ${params.aws_region ?: 'not set'}"
-log.info "Current working directory: ${workflow.launchDir}"
-log.info "Work directory: ${workflow.workDir}"
+// create input channel from FASTQ files in input directory
+ch_input = Channel.fromFilePairs("${params.input_dir}/*_{R1,R2,1,2}.{fastq,fq}{,.gz}", checkIfExists: false)
+    .ifEmpty { error "No paired FASTQ files found in ${params.input_dir}. Expected pattern: *_{R1,R2,1,2}.{fastq,fq}{,.gz}" }
 
-// using the current pattern
-log.info "Using fromFilePairs with pattern *_R{1,2}.fastq.gz"
-def pattern1 = "${params.input_dir}/*_R{1,2}.fastq.gz"
-log.info "Full pattern: ${pattern1}"
-
-// create S3 file pairs manually
-log.info "Creating S3 file channels manually for ERR008539"
-ch_input = Channel.of([
-    'ERR008539', 
-    ["${params.input_dir}/ERR008539_R1.fastq.gz", "${params.input_dir}/ERR008539_R2.fastq.gz"]
-])
-
-// create reference channel from input directory (just FASTA for indexing)
-ch_reference_fasta = Channel.fromPath("${params.input_dir}/*.fasta")
-    .ifEmpty { error "No reference genome (.fasta) found in ${params.input_dir}" }
-    .first()
+// create reference channel from explicit parameter
+ch_reference_fasta = Channel.fromPath(params.reference)
+    .ifEmpty { error "Reference genome not found at ${params.reference}" }
 
 // create known sites channel for BQSR
 ch_known_sites = Channel.fromPath(params.known_sites.split(',').collect { it.trim() })
