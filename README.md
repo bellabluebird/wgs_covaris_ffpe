@@ -1,67 +1,87 @@
 # nextflow wgs pipeline
 
-a simple nextflow pipeline for quality control of whole genome sequencing data
+a nextflow pipeline for whole genome sequencing analysis on aws batch
 
 ## what it does
 
-this pipeline takes your raw dna sequencing files (fastq) and:
-1. checks quality with fastqc
-2. trims low quality bases with fastp  
-3. checks quality again after trimming
-4. creates a summary report with multiqc
+this pipeline performs comprehensive wgs analysis through these modules:
+
+### quality control & preprocessing
+1. **fastqc** - analyzes raw fastq files → generates quality reports (html/zip)
+2. **fastp** - trims adapters and low-quality bases from fastq files → produces cleaned fastq files + json reports
+3. **fastqc** - re-analyzes cleaned fastq files → generates post-trim quality reports
+
+### alignment & processing  
+4. **bwa_mem2_index** - indexes reference fasta file → creates bwa-mem2 index files
+5. **bwa_mem2** - aligns cleaned fastq pairs to reference → produces sorted bam files
+6. **samtools_index** - indexes aligned bam files → creates bai index files
+7. **samtools_stats** - analyzes bam alignment statistics → generates stats files
+
+### duplicate marking & metrics
+8. **picard_markduplicates** - marks pcr duplicates in bam files → produces duplicate-marked bam + metrics
+9. **samtools_index** - indexes duplicate-marked bam → creates new bai files
+10. **picard_insert_size** - calculates insert size metrics from bam → generates insert size reports
+
+### base quality recalibration
+11. **gatk_baserecalibrator** - analyzes base quality patterns using known sites vcf → creates recalibration table
+12. **gatk_applybqsr** - applies recalibration to bam file → produces bqsr-corrected bam + index
+
+### final quality assessment
+13. **mosdepth** - calculates coverage depth from final bam → generates coverage summaries
+14. **qualimap** - performs comprehensive bam quality analysis → creates alignment quality reports
+15. **multiqc** - aggregates all reports from steps 1-14 → produces final combined html report
 
 ## what you need
 
 - paired-end fastq files (like `sample_R1.fastq.gz` and `sample_R2.fastq.gz`)
-- nextflow installed
-- either conda, docker, or aws batch set up
+- reference genome fasta file
+- known sites vcf file for bqsr (like dbsnp)
+- aws account with batch setup (see `AWS_SETUP.md`)
 
-## how to run locally
-
-```bash
-# with conda
-nextflow run main.nf -profile conda --input_dir /path/to/fastq/files
-
-# with docker  
-nextflow run main.nf -profile docker --input_dir /path/to/fastq/files
-```
-
-## how to run on aws
+## how to run
 
 1. follow the setup guide in `AWS_SETUP.md`
-2. push your code to github
+2. upload your files to s3:
+   - fastq files → `s3://your-bucket/samples/`
+   - reference genome → `s3://your-bucket/reference/`
+   - known sites vcf → `s3://your-bucket/known_sites/`
 3. go to github actions and click "run workflow"
-4. fill in your s3 bucket paths
-5. wait for it to finish and download the reports
+4. fill in your s3 paths:
+   - input s3 path: `s3://your-bucket/samples`
+   - reference s3 path: `s3://your-bucket/reference/genome.fasta`
+   - known sites: `s3://your-bucket/known_sites/dbsnp.vcf.gz`
+   - output s3 path: `s3://your-bucket/results`
+5. wait for completion and check results in s3
 
 ## files in this folder
 
-- `main.nf` - the main pipeline script
-- `nextflow.config` - configuration for different environments
+- `main.nf` - main pipeline script
+- `nextflow.config` - aws batch configuration
 - `modules/` - individual process definitions
-  - `fastqc.nf` - quality control checks
-  - `fastp.nf` - adapter trimming and filtering
-  - `multiqc.nf` - summary report generation
-- `.github/workflows/aws-nextflow.yml` - github actions workflow for aws
-- `aws-infrastructure.yaml` - cloudformation template for aws setup
-- `AWS_SETUP.md` - detailed aws setup instructions
+- `.github/workflows/aws-nextflow.yml` - github actions workflow
+- `aws/aws-infrastructure.yaml` - cloudformation template
+- `aws/AWS_SETUP.md` - detailed setup instructions
 
 ## results
 
-your results will be in the `results/` folder (or s3 bucket) with:
-- `fastqc/` - quality reports before trimming
-- `fastp/` - trimmed files and trimming reports
+your results will be in your s3 output bucket with:
+- `fastqc/` - quality reports
+- `fastp/` - trimmed files and reports
+- `alignment/` - bam files
+- `qualimap/` - alignment quality metrics
+- `mosdepth/` - coverage analysis
 - `multiqc/` - combined summary report (start here!)
 
 ## troubleshooting
 
-- make sure your fastq files are paired and follow naming conventions
-- check that you have enough memory/cpu allocated
-- look at the nextflow log files if something fails
-- for aws issues, check the setup guide and aws console
+- make sure fastq files are paired: `*_R1.fastq.gz` and `*_R2.fastq.gz`
+- verify all s3 paths are correct in github actions
+- check aws batch job status in aws console
+- look at github actions logs for errors
+- see `AWS_SETUP.md` for detailed troubleshooting
 
 ## need help?
 
-- check the nextflow documentation: https://nextflow.io/docs/latest/
-- for aws batch help: see `AWS_SETUP.md`
-- for pipeline issues: check the `.nextflow.log` file
+- aws setup issues: check `aws/AWS_SETUP.md`
+- pipeline issues: check github actions logs
+- nextflow docs: https://nextflow.io/docs/latest/
