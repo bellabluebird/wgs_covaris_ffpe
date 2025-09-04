@@ -1,20 +1,19 @@
-# ultra-simple cloudformation template for nextflow on aws batch
-# no frills, just what's needed to work
 AWSTemplateFormatVersion: '2010-09-09'
 Description: 'Minimal AWS Batch setup for Nextflow'
 
 Parameters:
-  # maximum cpu cores to prevent runaway costs
   MaxvCpus:
     Type: Number
-    Default: 32
-    Description: Maximum number of vCPUs
+    Default: 160
+    Description: Maximum number of vCPUs for Batch compute environment
+  InstanceType:
+    Type: String
+    Default: c5a.16xlarge
+    Description: EC2 instance type for compute nodes
 
 Resources:
-  
-  # ========== BASIC NETWORKING ==========
-  
-  # simple vpc - aws's private network for us  
+
+  # ========== NETWORKING ==========
   VPC:
     Type: AWS::EC2::VPC
     Properties:
@@ -22,7 +21,6 @@ Resources:
       EnableDnsHostnames: true
       EnableDnsSupport: true
 
-  # subnet - where compute instances will live
   Subnet:
     Type: AWS::EC2::Subnet
     Properties:
@@ -31,24 +29,20 @@ Resources:
       AvailabilityZone: !Select [0, !GetAZs '']
       MapPublicIpOnLaunch: true
 
-  # internet gateway - door to the internet
   InternetGateway:
     Type: AWS::EC2::InternetGateway
 
-  # attach gateway to vpc
   AttachGateway:
     Type: AWS::EC2::VPCGatewayAttachment
     Properties:
       VpcId: !Ref VPC
       InternetGatewayId: !Ref InternetGateway
 
-  # route table - network directions
   RouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
       VpcId: !Ref VPC
 
-  # route - send internet traffic to gateway
   Route:
     Type: AWS::EC2::Route
     DependsOn: AttachGateway
@@ -57,7 +51,6 @@ Resources:
       DestinationCidrBlock: '0.0.0.0/0'
       GatewayId: !Ref InternetGateway
 
-  # connect subnet to route table
   SubnetRouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
@@ -65,8 +58,6 @@ Resources:
       RouteTableId: !Ref RouteTable
 
   # ========== SECURITY ==========
-  
-  # security group - basic firewall (outbound only)
   SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -77,8 +68,6 @@ Resources:
           CidrIp: '0.0.0.0/0'
 
   # ========== PERMISSIONS ==========
-  
-  # role for aws batch service
   BatchServiceRole:
     Type: AWS::IAM::Role
     Properties:
@@ -92,7 +81,6 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole
 
-  # role for compute instances
   InstanceRole:
     Type: AWS::IAM::Role
     Properties:
@@ -117,7 +105,6 @@ Resources:
                   - 'arn:aws:s3:::bp-wgs-covaris-*'
                   - 'arn:aws:s3:::bp-wgs-covaris-*/*'
 
-  # instance profile - wrapper for the role
   InstanceProfile:
     Type: AWS::IAM::InstanceProfile
     Properties:
@@ -125,13 +112,12 @@ Resources:
         - !Ref InstanceRole
 
   # ========== COMPUTE ==========
-  
-  # compute environment - simplest possible
   ComputeEnvironment:
     Type: AWS::Batch::ComputeEnvironment
     Properties:
       Type: MANAGED
       State: ENABLED
+      ComputeEnvironmentName: nextflow-compute-env-2  # renamed for safe replacement
       ServiceRole: !GetAtt BatchServiceRole.Arn
       ComputeResources:
         Type: EC2
@@ -139,27 +125,23 @@ Resources:
         MaxvCpus: !Ref MaxvCpus
         DesiredvCpus: 0
         InstanceTypes: 
-          - r5.2xlarge
-          - r5.4xlarge
-          - r5.8xlarge
-          - x1.2xlarge
+          - !Ref InstanceType
         InstanceRole: !GetAtt InstanceProfile.Arn
         SecurityGroupIds:
           - !Ref SecurityGroup
         Subnets:
           - !Ref Subnet
 
-  # job queue - where jobs wait
   JobQueue:
     Type: AWS::Batch::JobQueue
     Properties:
+      JobQueueName: nextflow-compute-queue
       State: ENABLED
       Priority: 100
       ComputeEnvironmentOrder:
         - Order: 1
           ComputeEnvironment: !Ref ComputeEnvironment
 
-# outputs - useful info after creation
 Outputs:
   ComputeEnvironment:
     Description: 'Compute environment name'
