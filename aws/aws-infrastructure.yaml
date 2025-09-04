@@ -7,7 +7,7 @@ Parameters:
   # maximum cpu cores to prevent runaway costs
   MaxvCpus:
     Type: Number
-    Default: 16
+    Default: 32
     Description: Maximum number of vCPUs
 
 Resources:
@@ -140,7 +140,10 @@ Resources:
         MaxvCpus: !Ref MaxvCpus
         DesiredvCpus: 0
         InstanceTypes: 
-          - optimal
+          - r5.2xlarge
+          - r5.4xlarge
+          - r5.8xlarge
+          - x1.2xlarge
         InstanceRole: !GetAtt InstanceProfile.Arn
         SecurityGroupIds:
           - !Ref SecurityGroup
