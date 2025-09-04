@@ -132,7 +132,6 @@ Resources:
     Properties:
       Type: MANAGED
       State: ENABLED
-      ComputeEnvironmentName: nextflow-compute-env
       ServiceRole: !GetAtt BatchServiceRole.Arn
       ComputeResources:
         Type: EC2
@@ -154,7 +153,6 @@ Resources:
   JobQueue:
     Type: AWS::Batch::JobQueue
     Properties:
-      JobQueueName: nextflow-compute-queue
       State: ENABLED
       Priority: 100
       ComputeEnvironmentOrder:
