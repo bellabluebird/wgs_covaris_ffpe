@@ -7,7 +7,7 @@ Parameters:
   # maximum cpu cores to prevent runaway costs
   MaxvCpus:
     Type: Number
-    Default: 8
+    Default: 16
     Description: Maximum number of vCPUs
 
 Resources:
