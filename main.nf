@@ -93,11 +93,9 @@ workflow {
     // post-trim fastqc on cleaned reads
     fastqc_trimmed = FASTQC_TRIMMED(fastp_results.reads)
     
-    // create BWA-MEM2 index from reference (with conditional logic inside the module)
-    bwa_index = BWA_MEM2_INDEX(ch_reference_fasta)
-    
-    // combine indexed reference files for alignment
-    ch_reference_indexed = bwa_index.fasta.mix(bwa_index.index).collect()
+    // use pre-existing reference and index files from S3 (skip indexing)
+    ch_reference_indexed = Channel.fromPath("s3://bp-wgs-covaris-input-data/reference/bwa/*")
+        .collect()
     
     // alignment to reference genome
     bwa_results = BWA_MEM2(fastp_results.reads, ch_reference_indexed)
