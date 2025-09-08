@@ -85,3 +85,6 @@ your results will be in your s3 output bucket with:
 - aws setup issues: check `aws/AWS_SETUP.md`
 - pipeline issues: check github actions logs
 - nextflow docs: https://nextflow.io/docs/latest/
+
+
+9/8/25: this version has successful indexing and saving to references! from here, we will switch to using the index that i've stored for grch38
