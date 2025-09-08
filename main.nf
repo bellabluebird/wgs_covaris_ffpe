@@ -10,7 +10,7 @@ nextflow.enable.dsl = 2
 include { FASTQC } from './modules/fastqc.nf'
 include { FASTQC as FASTQC_TRIMMED } from './modules/fastqc.nf'
 include { FASTP } from './modules/fastp.nf'
-include { BWA_MEM2_INDEX } from './modules/bwa_mem2_index.nf'
+//include { BWA_MEM2_INDEX } from './modules/bwa_mem2_index.nf'
 include { BWA_MEM2 } from './modules/bwa_mem2.nf'
 include { SAMTOOLS_STATS } from './modules/samtools_stats.nf'
 include { SAMTOOLS_INDEX } from './modules/samtools_index.nf'
@@ -21,8 +21,8 @@ include { PICARD_COLLECTINSERTSIZEMETRICS } from './modules/picard_insert_size.n
 include { MOSDEPTH } from './modules/mosdepth.nf'
 include { GATK_BASERECALIBRATOR } from './modules/gatk_baserecalibrator.nf'
 include { GATK_APPLYBQSR } from './modules/gatk_applybqsr.nf'
-// include { GATK_HAPLOTYPECALLER } from './modules/gatk_haplotypecaller.nf'
-// include { BCFTOOLS_STATS } from './modules/bcftools_stats.nf'
+include { GATK_HAPLOTYPECALLER } from './modules/gatk_haplotypecaller.nf'
+include { BCFTOOLS_STATS } from './modules/bcftools_stats.nf'
 include { MULTIQC } from './modules/multiqc.nf'
 
 // parameters - all data-specific parameters must be provided explicitly
@@ -39,18 +39,6 @@ log.info "Input directory: ${params.input_dir}"
 log.info "Reference genome: ${params.reference}"
 log.info "Known sites: ${params.known_sites}"
 
-if (!params.input_dir) {
-    error "Please provide input directory with --input_dir"
-}
-
-if (!params.reference) {
-    error "Please provide reference genome with --reference"
-}
-
-if (!params.known_sites) {
-    error "Please provide known sites VCF files with --known_sites (required for BQSR)"
-}
-
 // create input channel from FASTQ files in input directory
 ch_input = Channel.fromFilePairs("${params.input_dir}/*_{R1,R2,1,2}.{fastq,fq}{,.gz}", checkIfExists: false)
     .ifEmpty { error "No paired FASTQ files found in ${params.input_dir}. Expected pattern: *_{R1,R2,1,2}.{fastq,fq}{,.gz}" }
@@ -58,24 +46,6 @@ ch_input = Channel.fromFilePairs("${params.input_dir}/*_{R1,R2,1,2}.{fastq,fq}{,
 // create reference channel from explicit parameter
 ch_reference_fasta = Channel.fromPath(params.reference)
     .ifEmpty { error "Reference genome not found at ${params.reference}" }
-
-// function to check if BWA-MEM2 index files exist in S3
-def checkBwaIndex(reference_path) {
-    def index_extensions = ['.amb', '.ann', '.bwt.2bit.64', '.pac', '.0123']
-    def reference_name = reference_path.getName()
-    def index_base_path = "s3://bp-wgs-covaris-input-data/reference/${reference_name}"
-    
-    // check if all required index files exist in S3
-    for (ext in index_extensions) {
-        def index_file = index_base_path + ext
-        if (!file(index_file).exists()) {
-            log.info "Missing index file: ${index_file}"
-            return false
-        }
-    }
-    log.info "All BWA-MEM2 index files found for ${reference_name}"
-    return true
-}
 
 // create known sites channel for BQSR
 ch_known_sites = Channel.fromPath(params.known_sites.split(',').collect { it.trim() })
@@ -96,6 +66,9 @@ workflow {
     // use pre-existing reference and index files from S3 (skip indexing)
     ch_reference_indexed = Channel.fromPath("s3://bp-wgs-covaris-input-data/reference/bwa/*")
         .collect()
+    
+    // create separate channel with only FASTA file for GATK processes
+    ch_reference_fasta_gatk = Channel.fromPath("s3://bp-wgs-covaris-input-data/reference/bwa/GCA_000001405.15_GRCh38_genomic.fasta")
     
     // alignment to reference genome
     bwa_results = BWA_MEM2(fastp_results.reads, ch_reference_indexed)
@@ -119,10 +92,10 @@ workflow {
     coverage_results = MOSDEPTH(samtools_index_marked.bam_bai)
     
     // base quality score recalibration with GATK
-    bqsr_table = GATK_BASERECALIBRATOR(samtools_index_marked.bam_bai, ch_reference_indexed, ch_known_sites)
+    bqsr_table = GATK_BASERECALIBRATOR(samtools_index_marked.bam_bai, ch_reference_fasta_gatk, ch_known_sites)
     
     // apply BQSR to get recalibrated BAM
-    bqsr_results = GATK_APPLYBQSR(samtools_index_marked.bam_bai, ch_reference_indexed, bqsr_table.recal_table)
+    bqsr_results = GATK_APPLYBQSR(samtools_index_marked.bam_bai, ch_reference_fasta_gatk, bqsr_table.recal_table)
     
     // quality metrics with Qualimap (on recalibrated BAM)
     qualimap_results = QUALIMAP(bqsr_results.bam.join(bqsr_results.bai))
