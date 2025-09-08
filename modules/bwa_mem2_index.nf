@@ -20,7 +20,6 @@ process BWA_MEM2_INDEX {
 
     script:
     def reference_name = fasta.getName()
-    def index_extensions = ['.amb', '.ann', '.bwt.2bit.64', '.pac', '.0123']
     
     """
     # Check if all index files exist locally
@@ -28,22 +27,22 @@ process BWA_MEM2_INDEX {
         echo "BWA-MEM2 index files not found locally - checking S3..."
         
         # Download missing files from S3
-        for ext in ${index_extensions.join(' ')}; do
-            if [ ! -f "${reference_name}${ext}" ]; then
-                echo "Downloading ${reference_name}${ext} from S3..."
-                aws s3 cp s3://bp-wgs-covaris-input-data/reference/${reference_name}${ext} ./
+        for ext in .amb .ann .bwt.2bit.64 .pac .0123; do
+            if [ ! -f "${reference_name}\${ext}" ]; then
+                echo "Downloading ${reference_name}\${ext} from S3..."
+                aws s3 cp s3://bp-wgs-covaris-input-data/reference/${reference_name}\${ext} ./
             fi
         done
 
         # If still missing, create the index
         missing_files=false
-        for ext in ${index_extensions.join(' ')}; do
-            if [ ! -f "${reference_name}${ext}" ]; then
+        for ext in .amb .ann .bwt.2bit.64 .pac .0123; do
+            if [ ! -f "${reference_name}\${ext}" ]; then
                 missing_files=true
             fi
         done
 
-        if [ "$missing_files" = true ]; then
+        if [ "\$missing_files" = "true" ]; then
             echo "Some index files missing after S3 copy - creating new index..."
             bwa-mem2 index ${fasta}
         else
