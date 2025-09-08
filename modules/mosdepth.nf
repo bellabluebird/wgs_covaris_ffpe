@@ -15,14 +15,20 @@ process MOSDEPTH {
     output:
     tuple val(sample_id), path("${sample_id}.mosdepth.global.dist.txt"), emit: global_dist
     tuple val(sample_id), path("${sample_id}.mosdepth.summary.txt"), emit: summary
-    tuple val(sample_id), path("${sample_id}.regions.bed.gz"), emit: regions, optional: true
+    tuple val(sample_id), path("${sample_id}.per-base.bed.gz"), emit: per_base, optional: true
     
     script:
     """
-    # run mosdepth for coverage analysis
+    # verify BAM file is indexed
+    if [[ ! -f "${bai}" ]]; then
+        echo "ERROR: BAM index file not found: ${bai}"
+        exit 1
+    fi
+    
+    # run mosdepth for coverage analysis with larger windows for efficiency
     mosdepth \\
         --threads ${task.cpus} \\
-        --by 500 \\
+        --by 5000 \\
         ${sample_id} \\
         ${bam}
     """
