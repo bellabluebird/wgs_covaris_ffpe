@@ -5,7 +5,7 @@ process MOSDEPTH {
     publishDir "${params.outdir}/coverage", mode: params.publish_mode
     
     // conda option
-    conda 'bioconda::mosdepth=0.3.3'
+    conda 'bioconda::mosdepth=0.3.8'
     
     // input: marked BAM file and index
     input:
