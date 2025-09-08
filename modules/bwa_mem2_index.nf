@@ -26,12 +26,12 @@ process BWA_MEM2_INDEX {
     
     if (index_exists) {
         """
-        echo "BWA-MEM2 index files already exist - copying from S3"
-        aws s3 cp s3://bp-wgs-covaris-input-data/reference/${reference_name}.amb .
-        aws s3 cp s3://bp-wgs-covaris-input-data/reference/${reference_name}.ann .
-        aws s3 cp s3://bp-wgs-covaris-input-data/reference/${reference_name}.bwt.2bit.64 .
-        aws s3 cp s3://bp-wgs-covaris-input-data/reference/${reference_name}.pac .
-        aws s3 cp s3://bp-wgs-covaris-input-data/reference/${reference_name}.0123 .
+        echo "BWA-MEM2 index files already exist - using existing files"
+        ln -s s3://bp-wgs-covaris-input-data/reference/${reference_name}.amb ${reference_name}.amb
+        ln -s s3://bp-wgs-covaris-input-data/reference/${reference_name}.ann ${reference_name}.ann  
+        ln -s s3://bp-wgs-covaris-input-data/reference/${reference_name}.bwt.2bit.64 ${reference_name}.bwt.2bit.64
+        ln -s s3://bp-wgs-covaris-input-data/reference/${reference_name}.pac ${reference_name}.pac
+        ln -s s3://bp-wgs-covaris-input-data/reference/${reference_name}.0123 ${reference_name}.0123
         """
     } else {
         """
