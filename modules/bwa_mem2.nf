@@ -18,7 +18,7 @@ process BWA_MEM2 {
     tuple val(sample_id), path("${sample_id}.sorted.bam.bai"), emit: bai
     
     script:
-    def ref_fasta = reference_files.find { it.toString().endsWith('.fna') }
+    def ref_fasta = reference_files.find { it.toString().endsWith('.fasta') }
     """
     # align reads to reference genome and sort
     bwa-mem2 mem \\
