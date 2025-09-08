@@ -19,8 +19,24 @@ process BWA_MEM2_INDEX {
     path "${fasta}.*", emit: index
 
     script:
-    """
-    # create BWA-MEM2 index
-    bwa-mem2 index ${fasta}
-    """
+    def reference_name = fasta.getName()
+    def index_exists = ['.amb', '.ann', '.bwt.2bit.64', '.pac', '.0123'].every { ext ->
+        file("s3://bp-wgs-covaris-input-data/reference/${reference_name}${ext}").exists()
+    }
+    
+    if (index_exists) {
+        """
+        echo "BWA-MEM2 index files already exist - copying from S3"
+        aws s3 cp s3://bp-wgs-covaris-input-data/reference/${reference_name}.amb .
+        aws s3 cp s3://bp-wgs-covaris-input-data/reference/${reference_name}.ann .
+        aws s3 cp s3://bp-wgs-covaris-input-data/reference/${reference_name}.bwt.2bit.64 .
+        aws s3 cp s3://bp-wgs-covaris-input-data/reference/${reference_name}.pac .
+        aws s3 cp s3://bp-wgs-covaris-input-data/reference/${reference_name}.0123 .
+        """
+    } else {
+        """
+        echo "BWA-MEM2 index files missing - creating new index"
+        bwa-mem2 index ${fasta}
+        """
+    }
 }
