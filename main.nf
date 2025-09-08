@@ -11,7 +11,7 @@ include { FASTQC } from './modules/fastqc.nf'
 include { FASTQC as FASTQC_TRIMMED } from './modules/fastqc.nf'
 include { FASTP } from './modules/fastp.nf'
 //include { BWA_MEM2_INDEX } from './modules/bwa_mem2_index.nf'
-include { BWA_MEM2 } from './modules/bwa_mem2.nf'
+include { BWA } from './modules/bwa.nf'
 include { SAMTOOLS_STATS } from './modules/samtools_stats.nf'
 include { SAMTOOLS_INDEX } from './modules/samtools_index.nf'
 include { SAMTOOLS_INDEX as SAMTOOLS_INDEX_MARKED } from './modules/samtools_index.nf'
@@ -71,7 +71,7 @@ workflow {
     ch_reference_fasta_gatk = Channel.fromPath("s3://bp-wgs-covaris-input-data/reference/bwa/GCA_000001405.15_GRCh38_genomic.fasta")
     
     // alignment to reference genome
-    bwa_results = BWA_MEM2(fastp_results.reads, ch_reference_indexed)
+    bwa_results = BWA(fastp_results.reads, ch_reference_indexed)
     
     // alignment statistics
     samtools_stats = SAMTOOLS_STATS(bwa_results.bam)
