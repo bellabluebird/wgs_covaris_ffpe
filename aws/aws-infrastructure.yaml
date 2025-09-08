@@ -117,7 +117,6 @@ Resources:
     Properties:
       Type: MANAGED
       State: ENABLED
-      ComputeEnvironmentName: nextflow-compute-env-2  # renamed for safe replacement
       ServiceRole: !GetAtt BatchServiceRole.Arn
       ComputeResources:
         Type: EC2
