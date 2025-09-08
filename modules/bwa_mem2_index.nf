@@ -4,12 +4,8 @@ process BWA_MEM2_INDEX {
     // publish alongside reference FASTA for future reuse
     publishDir "s3://bp-wgs-covaris-input-data/reference", mode: 'copy'
 
-<<<<<<< HEAD
-    conda 'bioconda::bwa-mem2=2.2.1'
-=======
     // conda option (make sure AWS CLI is available, see note below)
     conda 'bioconda::bwa-mem2=2.2.1,bioconda::awscli'
->>>>>>> 1dbd0eed72a31f8259fae879e3fa109fa4c03491
 
     input:
     path fasta
@@ -23,7 +19,6 @@ process BWA_MEM2_INDEX {
     
     """
     # Check if all index files exist locally
-<<<<<<< HEAD
     if [ -f "${reference_name}.amb" ] && \
        [ -f "${reference_name}.ann" ] && \
        [ -f "${reference_name}.bwt.2bit.64" ] && \
@@ -33,7 +28,6 @@ process BWA_MEM2_INDEX {
     else
         echo "Index files missing - creating BWA-MEM2 index."
         bwa-mem2 index ${fasta}
-=======
     if [ ! -f "${reference_name}.amb" ] || [ ! -f "${reference_name}.ann" ] || [ ! -f "${reference_name}.bwt.2bit.64" ] || [ ! -f "${reference_name}.pac" ] || [ ! -f "${reference_name}.0123" ]; then
         echo "BWA-MEM2 index files not found locally - checking S3..."
         
@@ -61,7 +55,6 @@ process BWA_MEM2_INDEX {
         fi
     else
         echo "All BWA-MEM2 index files exist locally - skipping download."
->>>>>>> 1dbd0eed72a31f8259fae879e3fa109fa4c03491
     fi
     """
 }
