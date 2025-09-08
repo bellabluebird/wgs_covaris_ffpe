@@ -7,8 +7,8 @@ Parameters:
     Default: 128
     Description: Maximum number of vCPUs for Batch compute environment
   InstanceType:
-    Type: CommaDelimitedList
-    Default: r5.4xlarge,r5.8xlarge,r5.12xlarge
+    Type: String
+    Default: r5.8xlarge
     Description: EC2 instance type for compute nodes
 
 Resources:

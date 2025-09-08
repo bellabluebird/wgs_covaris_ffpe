@@ -3,8 +3,8 @@
 process BWA_MEM2_INDEX {
     tag "$fasta.baseName"
 
-    // publish alongside the fasta file for referencing in future runs
-    publishDir { fasta.parent }, mode: 'copy'
+    // publish alongside reference FASTA for future reuse
+    publishDir "s3://bp-wgs-covaris-input-data/reference", mode: 'copy'
 
     // conda option
     conda 'bioconda::bwa-mem2=2.2.1'
