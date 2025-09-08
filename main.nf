@@ -93,28 +93,11 @@ workflow {
     // post-trim fastqc on cleaned reads
     fastqc_trimmed = FASTQC_TRIMMED(fastp_results.reads)
     
-    // check if BWA-MEM2 index exists, create if needed
-    if (checkBwaIndex(ch_reference_fasta.val)) {
-        log.info "BWA-MEM2 index files found - skipping indexing"
-        
-        // use existing index files
-        def reference_name = ch_reference_fasta.val.getName()
-        ch_reference_indexed = Channel.value([
-            file("s3://bp-wgs-covaris-input-data/reference/${reference_name}"),
-            file("s3://bp-wgs-covaris-input-data/reference/${reference_name}.amb"),
-            file("s3://bp-wgs-covaris-input-data/reference/${reference_name}.ann"),
-            file("s3://bp-wgs-covaris-input-data/reference/${reference_name}.bwt.2bit.64"),
-            file("s3://bp-wgs-covaris-input-data/reference/${reference_name}.pac"),
-            file("s3://bp-wgs-covaris-input-data/reference/${reference_name}.0123")
-        ]).collect()
-        
-    } else {
-        log.info "BWA-MEM2 index files missing - running indexing"
-        
-        // create new index files
-        bwa_index = BWA_MEM2_INDEX(ch_reference_fasta)
-        ch_reference_indexed = bwa_index.fasta.mix(bwa_index.index).collect()
-    }
+    // create BWA-MEM2 index from reference (with conditional logic inside the module)
+    bwa_index = BWA_MEM2_INDEX(ch_reference_fasta)
+    
+    // combine indexed reference files for alignment
+    ch_reference_indexed = bwa_index.fasta.mix(bwa_index.index).collect()
     
     // alignment to reference genome
     bwa_results = BWA_MEM2(fastp_results.reads, ch_reference_indexed)
