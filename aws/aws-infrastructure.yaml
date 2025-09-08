@@ -4,10 +4,10 @@ Description: 'Minimal AWS Batch setup for Nextflow'
 Parameters:
   MaxvCpus:
     Type: Number
-    Default: 160
+    Default: 128
     Description: Maximum number of vCPUs for Batch compute environment
   InstanceType:
-    Type: String
+    Type: CommaDelimitedList
     Default: r5.4xlarge,r5.8xlarge,r5.12xlarge
     Description: EC2 instance type for compute nodes
 
