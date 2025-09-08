@@ -59,6 +59,24 @@ ch_input = Channel.fromFilePairs("${params.input_dir}/*_{R1,R2,1,2}.{fastq,fq}{,
 ch_reference_fasta = Channel.fromPath(params.reference)
     .ifEmpty { error "Reference genome not found at ${params.reference}" }
 
+// function to check if BWA-MEM2 index files exist in S3
+def checkBwaIndex(reference_path) {
+    def index_extensions = ['.amb', '.ann', '.bwt.2bit.64', '.pac', '.0123']
+    def reference_name = reference_path.getName()
+    def index_base_path = "s3://bp-wgs-covaris-input-data/reference/${reference_name}"
+    
+    // check if all required index files exist in S3
+    for (ext in index_extensions) {
+        def index_file = index_base_path + ext
+        if (!file(index_file).exists()) {
+            log.info "Missing index file: ${index_file}"
+            return false
+        }
+    }
+    log.info "All BWA-MEM2 index files found for ${reference_name}"
+    return true
+}
+
 // create known sites channel for BQSR
 ch_known_sites = Channel.fromPath(params.known_sites.split(',').collect { it.trim() })
     .ifEmpty { error "No known sites VCF files found at specified paths" }
@@ -75,11 +93,28 @@ workflow {
     // post-trim fastqc on cleaned reads
     fastqc_trimmed = FASTQC_TRIMMED(fastp_results.reads)
     
-    // create BWA-MEM2 index from reference
-    bwa_index = BWA_MEM2_INDEX(ch_reference_fasta)
-    
-    // combine indexed reference files for alignment
-    ch_reference_indexed = bwa_index.fasta.mix(bwa_index.index).collect()
+    // check if BWA-MEM2 index exists, create if needed
+    if (checkBwaIndex(ch_reference_fasta.val)) {
+        log.info "BWA-MEM2 index files found - skipping indexing"
+        
+        // use existing index files
+        def reference_name = ch_reference_fasta.val.getName()
+        ch_reference_indexed = Channel.value([
+            file("s3://bp-wgs-covaris-input-data/reference/${reference_name}"),
+            file("s3://bp-wgs-covaris-input-data/reference/${reference_name}.amb"),
+            file("s3://bp-wgs-covaris-input-data/reference/${reference_name}.ann"),
+            file("s3://bp-wgs-covaris-input-data/reference/${reference_name}.bwt.2bit.64"),
+            file("s3://bp-wgs-covaris-input-data/reference/${reference_name}.pac"),
+            file("s3://bp-wgs-covaris-input-data/reference/${reference_name}.0123")
+        ]).collect()
+        
+    } else {
+        log.info "BWA-MEM2 index files missing - running indexing"
+        
+        // create new index files
+        bwa_index = BWA_MEM2_INDEX(ch_reference_fasta)
+        ch_reference_indexed = bwa_index.fasta.mix(bwa_index.index).collect()
+    }
     
     // alignment to reference genome
     bwa_results = BWA_MEM2(fastp_results.reads, ch_reference_indexed)
