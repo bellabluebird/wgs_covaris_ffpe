@@ -5,17 +5,16 @@ process GATK_APPLYBQSR {
     publishDir "${params.outdir}/bqsr", mode: params.publish_mode
     
     // conda option
-    conda 'bioconda::gatk4=4.4.0.0 bioconda::samtools=1.17'
+    conda 'bioconda::gatk4=4.4.0.0'
     
     // input: joined BAM file, index, recalibration table, and reference files
     input:
     tuple val(sample_id), path(bam), path(bai), path(recal_table)
     path reference_files
     
-    // output: BQSR-recalibrated BAM file and index
+    // output: BQSR-recalibrated BAM file
     output:
     tuple val(sample_id), path("${sample_id}.recal.bam"), emit: bam
-    tuple val(sample_id), path("${sample_id}.recal.bam.bai"), emit: bai
     
     script:
     def ref_fasta = reference_files.find { it.toString().endsWith('.fasta') }
@@ -26,8 +25,5 @@ process GATK_APPLYBQSR {
         -I ${bam} \\
         --bqsr-recal-file ${recal_table} \\
         -O ${sample_id}.recal.bam
-    
-    # index the recalibrated BAM file
-    samtools index ${sample_id}.recal.bam
     """
 }
