@@ -47,8 +47,8 @@ ch_input = Channel.fromFilePairs("${params.input_dir}/*_{R1,R2,1,2}.{fastq,fq}{,
 ch_reference_fasta = Channel.fromPath(params.reference)
     .ifEmpty { error "Reference genome not found at ${params.reference}" }
 
-// create known sites channel for BQSR (include VCF and index files, but filter in module)
-ch_known_sites = Channel.fromPath(params.known_sites.split(',').collect { it.trim() })
+// create known sites channel for BQSR (use parameter or default compatible sites)
+ch_known_sites = Channel.fromPath((params.known_sites ?: params.default_known_sites).split(',').collect { it.trim() })
     .ifEmpty { error "No known sites files found at specified paths" }
     .collect() 
 
@@ -63,12 +63,12 @@ workflow {
     // post-trim fastqc on cleaned reads
     fastqc_trimmed = FASTQC_TRIMMED(fastp_results.reads)
     
-    // use pre-existing reference and index files from S3 (skip indexing)
-    ch_reference_indexed = Channel.fromPath("s3://bp-wgs-covaris-input-data/reference/bwa/*")
+    // use compatible references from config parameters (chr1, chr2 format)
+    ch_reference_indexed = Channel.fromPath(params.reference_indexed_path ?: "s3://bp-wgs-covaris-input-data/reference/bwa/*")
         .collect()
     
     // create separate channel with GATK-required reference files (FASTA, .fai, .dict)
-    ch_reference_fasta_gatk = Channel.fromPath("s3://bp-wgs-covaris-input-data/reference/bwa/GCA_000001405.15_GRCh38_genomic.{fasta,fasta.fai,dict}")
+    ch_reference_fasta_gatk = Channel.fromPath(params.reference_gatk_path ?: "s3://bp-wgs-covaris-input-data/reference/bwa/GCA_000001405.15_GRCh38_genomic.{fasta,fasta.fai,dict}")
         .collect()
     
     // alignment to reference genome
