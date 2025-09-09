@@ -67,8 +67,9 @@ workflow {
     ch_reference_indexed = Channel.fromPath("s3://bp-wgs-covaris-input-data/reference/bwa/*")
         .collect()
     
-    // create separate channel with only FASTA file for GATK processes
-    ch_reference_fasta_gatk = Channel.fromPath("s3://bp-wgs-covaris-input-data/reference/bwa/GCA_000001405.15_GRCh38_genomic.fasta")
+    // create separate channel with GATK-required reference files (FASTA, .fai, .dict)
+    ch_reference_fasta_gatk = Channel.fromPath("s3://bp-wgs-covaris-input-data/reference/bwa/GCA_000001405.15_GRCh38_genomic.{fasta,fasta.fai,dict}")
+        .collect()
     
     // alignment to reference genome
     bwa_results = BWA(fastp_results.reads, ch_reference_indexed)
