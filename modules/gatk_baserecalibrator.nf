@@ -19,7 +19,9 @@ process GATK_BASERECALIBRATOR {
     
     script:
     def ref_fasta = reference_files.find { it.toString().endsWith('.fasta') }
-    def known_sites_args = known_sites ? known_sites.collect { "--known-sites ${it}" }.join(' ') : ""
+    // filter to only VCF files for --known-sites arguments (exclude .tbi files)
+    def vcf_files = known_sites.findAll { it.toString().endsWith('.vcf') || it.toString().endsWith('.vcf.gz') }
+    def known_sites_args = vcf_files ? vcf_files.collect { "--known-sites ${it}" }.join(' ') : ""
     """
     # generate base recalibration table
     gatk BaseRecalibrator \\

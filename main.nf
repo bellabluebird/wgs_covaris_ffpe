@@ -47,10 +47,9 @@ ch_input = Channel.fromFilePairs("${params.input_dir}/*_{R1,R2,1,2}.{fastq,fq}{,
 ch_reference_fasta = Channel.fromPath(params.reference)
     .ifEmpty { error "Reference genome not found at ${params.reference}" }
 
-// create known sites channel for BQSR (filter out index files)
+// create known sites channel for BQSR (include VCF and index files, but filter in module)
 ch_known_sites = Channel.fromPath(params.known_sites.split(',').collect { it.trim() })
-    .filter { it.toString().endsWith(".vcf") || it.toString().endsWith(".vcf.gz") }
-    .ifEmpty { error "No known sites VCF files found at specified paths" }
+    .ifEmpty { error "No known sites files found at specified paths" }
     .collect() 
 
 // main workflow
