@@ -98,8 +98,9 @@ workflow {
     // base quality score recalibration with GATK
     bqsr_table = GATK_BASERECALIBRATOR(samtools_index_marked.bam_bai, ch_reference_fasta_gatk, ch_known_sites)
     
-    // apply BQSR to get recalibrated BAM
-    bqsr_results = GATK_APPLYBQSR(samtools_index_marked.bam_bai, ch_reference_fasta_gatk, bqsr_table.recal_table)
+    // apply BQSR to get recalibrated BAM (join BAM and BQSR table by sample_id)
+    bam_bqsr_joined = samtools_index_marked.bam_bai.join(bqsr_table.recal_table)
+    bqsr_results = GATK_APPLYBQSR(bam_bqsr_joined, ch_reference_fasta_gatk)
     
     // quality metrics with Qualimap (on recalibrated BAM)
     qualimap_results = QUALIMAP(bqsr_results.bam.join(bqsr_results.bai))

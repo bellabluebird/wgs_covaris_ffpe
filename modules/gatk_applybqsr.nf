@@ -7,11 +7,10 @@ process GATK_APPLYBQSR {
     // conda option
     conda 'bioconda::gatk4=4.4.0.0 bioconda::samtools=1.17'
     
-    // input: marked BAM file, index, reference files, and recalibration table
+    // input: joined BAM file, index, recalibration table, and reference files
     input:
-    tuple val(sample_id), path(bam), path(bai)
+    tuple val(sample_id), path(bam), path(bai), path(recal_table)
     path reference_files
-    tuple val(sample_id), path(recal_table)
     
     // output: BQSR-recalibrated BAM file and index
     output:
