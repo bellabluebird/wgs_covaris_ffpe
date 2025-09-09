@@ -21,6 +21,7 @@ include { PICARD_COLLECTINSERTSIZEMETRICS } from './modules/picard_insert_size.n
 include { MOSDEPTH } from './modules/mosdepth.nf'
 include { GATK_BASERECALIBRATOR } from './modules/gatk_baserecalibrator.nf'
 include { GATK_APPLYBQSR } from './modules/gatk_applybqsr.nf'
+include { SAMTOOLS_INDEX as SAMTOOLS_INDEX_BQSR } from './modules/samtools_index.nf'
 include { GATK_HAPLOTYPECALLER } from './modules/gatk_haplotypecaller.nf'
 include { BCFTOOLS_STATS } from './modules/bcftools_stats.nf'
 include { MULTIQC } from './modules/multiqc.nf'
@@ -102,8 +103,11 @@ workflow {
     bam_bqsr_joined = samtools_index_marked.bam_bai.join(bqsr_table.recal_table)
     bqsr_results = GATK_APPLYBQSR(bam_bqsr_joined, ch_reference_fasta_gatk)
     
-    // quality metrics with Qualimap (on recalibrated BAM)
-    qualimap_results = QUALIMAP(bqsr_results.bam.join(bqsr_results.bai))
+    // index the recalibrated BAM files
+    samtools_index_bqsr = SAMTOOLS_INDEX_BQSR(bqsr_results.bam)
+    
+    // quality metrics with Qualimap (on recalibrated indexed BAM)
+    qualimap_results = QUALIMAP(samtools_index_bqsr.bam_bai)
 
     // collect all reports for multiqc
     multiqc_input = fastqc_raw.zip.map { id, file -> file }
