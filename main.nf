@@ -24,6 +24,7 @@ include { GATK_APPLYBQSR } from './modules/gatk_applybqsr.nf'
 include { SAMTOOLS_INDEX as SAMTOOLS_INDEX_BQSR } from './modules/samtools_index.nf'
 include { GATK_HAPLOTYPECALLER } from './modules/gatk_haplotypecaller.nf'
 include { GATK_GENOTYPEGVCFS } from './modules/gatk_genotypegvcfs.nf'
+include { GATK_VARIANTFILTRATION } from './modules/gatk_variantfiltration.nf'
 include { BCFTOOLS_STATS } from './modules/bcftools_stats.nf'
 include { MULTIQC } from './modules/multiqc.nf'
 
@@ -118,6 +119,12 @@ workflow {
     
     // joint genotyping across all samples
     joint_vcf = GATK_GENOTYPEGVCFS(all_gvcfs, ch_reference_fasta_gatk)
+    
+    // apply hard filtering to variants
+    filtered_vcf = GATK_VARIANTFILTRATION(joint_vcf.vcf, joint_vcf.vcf_index, ch_reference_fasta_gatk)
+    
+    // generate variant statistics on filtered VCF
+    variant_stats = BCFTOOLS_STATS(["joint_variants", filtered_vcf.vcf])
 
     // collect all reports for multiqc
     multiqc_input = fastqc_raw.zip.map { id, file -> file }
@@ -128,6 +135,7 @@ workflow {
     .mix(insert_size_metrics.metrics.map { id, file -> file })
     .mix(coverage_results.summary.map { id, file -> file })
     .mix(qualimap_results.results.map { id, dir -> dir })
+    .mix(variant_stats.stats.map { id, file -> file })
     .collect()
 
     // multiqc report
