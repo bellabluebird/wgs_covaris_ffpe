@@ -23,6 +23,7 @@ include { GATK_BASERECALIBRATOR } from './modules/gatk_baserecalibrator.nf'
 include { GATK_APPLYBQSR } from './modules/gatk_applybqsr.nf'
 include { SAMTOOLS_INDEX as SAMTOOLS_INDEX_BQSR } from './modules/samtools_index.nf'
 include { GATK_HAPLOTYPECALLER } from './modules/gatk_haplotypecaller.nf'
+include { GATK_GENOTYPEGVCFS } from './modules/gatk_genotypegvcfs.nf'
 include { BCFTOOLS_STATS } from './modules/bcftools_stats.nf'
 include { MULTIQC } from './modules/multiqc.nf'
 
@@ -111,6 +112,12 @@ workflow {
     
     // variant calling with GATK HaplotypeCaller (generate GVCFs for joint genotyping)
     haplotypecaller_results = GATK_HAPLOTYPECALLER(samtools_index_bqsr.bam_bai, ch_reference_fasta_gatk)
+    
+    // collect all GVCFs for joint genotyping
+    all_gvcfs = haplotypecaller_results.gvcf.map { id, gvcf -> gvcf }.collect()
+    
+    // joint genotyping across all samples
+    joint_vcf = GATK_GENOTYPEGVCFS(all_gvcfs, ch_reference_fasta_gatk)
 
     // collect all reports for multiqc
     multiqc_input = fastqc_raw.zip.map { id, file -> file }
