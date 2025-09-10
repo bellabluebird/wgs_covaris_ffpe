@@ -108,6 +108,9 @@ workflow {
     
     // quality metrics with Qualimap (on recalibrated indexed BAM)
     qualimap_results = QUALIMAP(samtools_index_bqsr.bam_bai)
+    
+    // variant calling with GATK HaplotypeCaller (generate GVCFs for joint genotyping)
+    haplotypecaller_results = GATK_HAPLOTYPECALLER(samtools_index_bqsr.bam_bai, ch_reference_fasta_gatk)
 
     // collect all reports for multiqc
     multiqc_input = fastqc_raw.zip.map { id, file -> file }
