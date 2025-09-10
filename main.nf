@@ -51,9 +51,9 @@ ch_reference_fasta = Channel.fromPath(params.reference)
     .ifEmpty { error "Reference genome not found at ${params.reference}" }
 
 // create known sites channel for BQSR (use compatible known sites from hg38)
-ch_known_sites = params.known_sites ?
+ch_known_sites = (params.known_sites ?
     Channel.fromPath(params.known_sites.split(',').collect { it.trim() }) :
-    Channel.fromPath("s3://bp-wgs-covaris-input-data/reference/known_sites_hg38/Homo_sapiens_assembly38.dbsnp138.vcf,s3://bp-wgs-covaris-input-data/reference/known_sites_hg38/Homo_sapiens_assembly38.dbsnp138.vcf.idx,s3://bp-wgs-covaris-input-data/reference/known_sites_hg38/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz,s3://bp-wgs-covaris-input-data/reference/known_sites_hg38/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz.tbi".split(',').collect { it.trim() })
+    Channel.fromPath("s3://bp-wgs-covaris-input-data/reference/known_sites_hg38/Homo_sapiens_assembly38.dbsnp138.vcf,s3://bp-wgs-covaris-input-data/reference/known_sites_hg38/Homo_sapiens_assembly38.dbsnp138.vcf.idx,s3://bp-wgs-covaris-input-data/reference/known_sites_hg38/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz,s3://bp-wgs-covaris-input-data/reference/known_sites_hg38/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz.tbi".split(',').collect { it.trim() }))
 ch_known_sites = ch_known_sites
     .ifEmpty { error "No known sites files found at specified paths" }
     .collect() 
@@ -115,7 +115,7 @@ workflow {
     haplotypecaller_results = GATK_HAPLOTYPECALLER(samtools_index_bqsr.bam_bai, ch_reference_fasta_gatk)
     
     // collect all GVCFs for joint genotyping
-    all_gvcfs = haplotypecaller_results.gvcf.map { id, gvcf -> gvcf }.flatten.().collect()
+    all_gvcfs = haplotypecaller_results.gvcf.map { id, gvcf -> gvcf }.flatten().collect()
     
     // joint genotyping across all samples
     joint_vcf = GATK_GENOTYPEGVCFS(all_gvcfs, ch_reference_fasta_gatk)
