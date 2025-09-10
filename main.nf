@@ -118,7 +118,7 @@ workflow {
     haplotypecaller_results.gvcf.view { row -> "HaplotypeCaller Output: $row" }
 
     // collect all GVCFs for joint genotyping
-    all_gvcfs = haplotypecaller_results.gvcf.map { gvcf -> gvcf }.unique().collect()
+    all_gvcfs = haplotypecaller_results.gvcf.map { id, gvcf -> gvcf }.unique().collect()
     
     // debug to see the collected GVCFs 
     all_gvcfs.view { list -> "All GVCFs for joint genotyping → ${list}" }
