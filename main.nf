@@ -114,9 +114,15 @@ workflow {
     // variant calling with GATK HaplotypeCaller (generate GVCFs for joint genotyping)
     haplotypecaller_results = GATK_HAPLOTYPECALLER(samtools_index_bqsr.bam_bai, ch_reference_fasta_gatk)
     
+    // debug to see what's being passed to the new channel
+    haplotypecaller_results.gvcf.view { row -> "HaplotypeCaller Output: $row" }
+
     // collect all GVCFs for joint genotyping
-    all_gvcfs = haplotypecaller_results.gvcf.map { id, gvcf -> gvcf }.flatten().unique().collect()
+    all_gvcfs = haplotypecaller_results.gvcf.map { gvcf -> gvcf }.unique().collect()
     
+    // debug to see the collected GVCFs 
+    all_gvcfs.view { list -> "All GVCFs for joint genotyping → ${list}" }
+
     // joint genotyping across all samples
     joint_vcf = GATK_GENOTYPEGVCFS(all_gvcfs, ch_reference_fasta_gatk)
     
