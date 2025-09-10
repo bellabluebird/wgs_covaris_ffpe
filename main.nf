@@ -124,7 +124,7 @@ workflow {
     filtered_vcf = GATK_VARIANTFILTRATION(joint_vcf.vcf, joint_vcf.vcf_index, ch_reference_fasta_gatk)
     
     // generate variant statistics on filtered VCF
-    variant_stats = BCFTOOLS_STATS(["joint_variants", filtered_vcf.vcf])
+    variant_stats = BCFTOOLS_STATS(filtered_vcf.vcf.map { vcf -> ["joint_variants", vcf] })
 
     // collect all reports for multiqc
     multiqc_input = fastqc_raw.zip.map { id, file -> file }
