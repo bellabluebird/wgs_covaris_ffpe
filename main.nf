@@ -115,7 +115,7 @@ workflow {
     haplotypecaller_results = GATK_HAPLOTYPECALLER(samtools_index_bqsr.bam_bai, ch_reference_fasta_gatk)
     
     // collect all GVCFs for joint genotyping
-    all_gvcfs = haplotypecaller_results.gvcf.map { id, gvcf -> gvcf }.collect()
+    all_gvcfs = haplotypecaller_results.gvcf.map { id, gvcf -> gvcf }.flatten.()collect()
     
     // joint genotyping across all samples
     joint_vcf = GATK_GENOTYPEGVCFS(all_gvcfs, ch_reference_fasta_gatk)
