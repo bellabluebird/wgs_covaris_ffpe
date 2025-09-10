@@ -117,7 +117,7 @@ workflow {
     .mix(markduplicates_results.metrics.map { id, file -> file })
     .mix(insert_size_metrics.metrics.map { id, file -> file })
     .mix(coverage_results.summary.map { id, file -> file })
-    .mix(qualimap_results.genome_results.map { id, file -> file })
+    .mix(qualimap_results.results.map { id, dir -> dir })
     .collect()
 
     // multiqc report
