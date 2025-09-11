@@ -1,14 +1,11 @@
 // modules/fastqc.nf
 
 process FASTQC {
-    // label for job while running
     tag "$sample_id"
-    // 
     publishDir "${params.outdir}/fastqc", mode: params.publish_mode
     
     // conda option
     conda 'bioconda::fastqc=0.12.1'
-    // REMOVED hardcoded container - let config handle this
     
     // input: paired reads from fastp
     input:

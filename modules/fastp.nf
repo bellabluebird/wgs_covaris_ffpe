@@ -4,10 +4,6 @@ process FASTP {
     tag "$sample_id"
     publishDir "${params.outdir}/fastp", mode: params.publish_mode
     
-    // conda option 
-    conda 'bioconda::fastp=0.23.4'
-    // REMOVED hardcoded container - let config handle this
-    
     // input: paired fastq files
     input:
     tuple val(sample_id), path(reads)
