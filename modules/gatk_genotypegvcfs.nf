@@ -7,9 +7,10 @@ process GATK_GENOTYPEGVCFS {
     // conda option
     conda 'bioconda::gatk4=4.4.0.0'
     
-    // input: collection of GVCF files and reference files
+    // input: combined GVCF file and reference files
     input:
-    path gvcfs
+    path combined_gvcf
+    path gvcf_index
     path reference_files
     
     // output: joint-called VCF file
@@ -19,12 +20,11 @@ process GATK_GENOTYPEGVCFS {
     
     script:
     def ref_fasta = reference_files.find { it.toString().endsWith('.fasta') }
-    def gvcf_inputs = gvcfs.collect { "--variant ${it}" }.join(' ')
     """
-    # joint genotyping with GATK GenotypeGVCFs
+    # joint genotyping with GATK GenotypeGVCFs using combined GVCF
     gatk GenotypeGVCFs \\
         -R ${ref_fasta} \\
-        ${gvcf_inputs} \\
+        -V ${combined_gvcf} \\
         -O joint_genotyped.vcf.gz
     """
 }

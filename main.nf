@@ -24,6 +24,7 @@ include { GATK_APPLYBQSR } from './modules/gatk_applybqsr.nf'
 include { SAMTOOLS_INDEX as SAMTOOLS_INDEX_BQSR } from './modules/samtools_index.nf'
 include { GATK_HAPLOTYPECALLER } from './modules/gatk_haplotypecaller.nf'
 include { GATK_GENOTYPEGVCFS } from './modules/gatk_genotypegvcfs.nf'
+include { GATK_COMBINEGVCFS } from './modules/gatk_combinegvcfs.nf'
 include { GATK_VARIANTFILTRATION } from './modules/gatk_variantfiltration.nf'
 include { BCFTOOLS_STATS } from './modules/bcftools_stats.nf'
 include { MULTIQC } from './modules/multiqc.nf'
@@ -117,14 +118,17 @@ workflow {
     // debug to see what's being passed to the new channel
     haplotypecaller_results.gvcf.view { row -> "HaplotypeCaller Output: $row" }
 
-    // collect all GVCFs for joint genotyping
+    // collect all GVCFs for combining
     all_gvcfs = haplotypecaller_results.gvcf.map { id, gvcf -> gvcf }.unique().collect()
     
     // debug to see the collected GVCFs 
-    all_gvcfs.view { list -> "All GVCFs for joint genotyping → ${list}" }
+    all_gvcfs.view { list -> "All GVCFs for combining → ${list}" }
 
-    // joint genotyping across all samples
-    joint_vcf = GATK_GENOTYPEGVCFS(all_gvcfs, ch_reference_fasta_gatk)
+    // combine individual GVCFs into single cohort GVCF
+    combined_gvcf = GATK_COMBINEGVCFS(all_gvcfs, ch_reference_fasta_gatk)
+    
+    // joint genotyping using combined GVCF
+    joint_vcf = GATK_GENOTYPEGVCFS(combined_gvcf.gvcf, combined_gvcf.gvcf_index, ch_reference_fasta_gatk)
     
     // apply hard filtering to variants
     filtered_vcf = GATK_VARIANTFILTRATION(joint_vcf.vcf, joint_vcf.vcf_index, ch_reference_fasta_gatk)
