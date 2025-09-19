@@ -52,6 +52,7 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ github.event.inputs.aws_region }}
+          role-duration-seconds: 43200
 
       - name: Setup Java
         uses: actions/setup-java@v4
