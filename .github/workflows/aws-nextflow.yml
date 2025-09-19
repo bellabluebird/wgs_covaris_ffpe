@@ -109,6 +109,12 @@ jobs:
         run: |
           echo "S3 access already confirmed in previous steps - skipping complex test script"
 
+      # Download previous Nextflow metadata for resume functionality
+      - name: Download Nextflow metadata from S3
+        run: |
+          echo "Attempting to download previous Nextflow metadata for resume..."
+          aws s3 sync s3://bp-wgs-covaris-nextflow-workdir/metadata/.nextflow/ .nextflow/ --quiet || echo "No previous metadata found - starting fresh"
+          
       # Fusion / Wave integration
       - name: Export Seqera/Tower Token
         run: echo "TOWER_ACCESS_TOKEN=${{ secrets.TOWER_ACCESS_TOKEN }}" >> $GITHUB_ENV
@@ -128,8 +134,8 @@ jobs:
           BASE_CMD="$BASE_CMD --reference \"${{ github.event.inputs.reference_s3_path }}\""
           BASE_CMD="$BASE_CMD --known_sites \"${{ github.event.inputs.known_sites }}\""
           
-          # Add reporting options
-          FULL_CMD="$BASE_CMD -with-report nextflow_report.html -with-timeline timeline.html -with-dag flowchart.html -with-fusion"
+          # Add reporting options and resume
+          FULL_CMD="$BASE_CMD -resume -with-report nextflow_report.html -with-timeline timeline.html -with-dag flowchart.html -with-fusion"
           
           echo "NEXTFLOW_CMD=$FULL_CMD" >> $GITHUB_OUTPUT
           echo "Built command: $FULL_CMD"
@@ -142,6 +148,12 @@ jobs:
           
           ${{ steps.build_cmd.outputs.NEXTFLOW_CMD }}
 
+      - name: Upload Nextflow metadata to S3 for resume
+        if: always()
+        run: |
+          echo "Uploading Nextflow metadata to S3 for future resume..."
+          aws s3 sync .nextflow/ s3://bp-wgs-covaris-nextflow-workdir/metadata/.nextflow/ --quiet || echo "Failed to upload metadata"
+
       - name: Upload Nextflow reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -153,7 +165,8 @@ jobs:
             flowchart.html
             .nextflow.log
 
-      - name: Cleanup
+      - name: Cleanup local files
         if: always()
         run: |
+          echo "Cleaning up local files only (S3 metadata preserved)..."
           rm -rf work/ .nextflow*
