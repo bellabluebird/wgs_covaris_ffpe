@@ -118,14 +118,15 @@ workflow {
     // debug to see what's being passed to the new channel
     haplotypecaller_results.gvcf.view { row -> "HaplotypeCaller Output: $row" }
 
-    // collect all GVCFs for combining
-    all_gvcfs = haplotypecaller_results.gvcf.map { id, gvcf -> gvcf }.unique().collect()
+    // collect all GVCFs for combining - need both GVCF files and their indices
+    all_gvcfs = haplotypecaller_results.gvcf.map { id, gvcf -> gvcf }.collect()
+    all_gvcf_indices = haplotypecaller_results.gvcf_index.map { id, gvcf_idx -> gvcf_idx }.collect()
     
     // debug to see the collected GVCFs 
     all_gvcfs.view { list -> "All GVCFs for combining → ${list}" }
 
     // combine individual GVCFs into single cohort GVCF
-    combined_gvcf = GATK_COMBINEGVCFS(all_gvcfs, ch_reference_fasta_gatk)
+    combined_gvcf = GATK_COMBINEGVCFS(all_gvcfs, all_gvcf_indices, ch_reference_fasta_gatk)
     
     // joint genotyping using combined GVCF
     joint_vcf = GATK_GENOTYPEGVCFS(combined_gvcf.gvcf, combined_gvcf.gvcf_index, ch_reference_fasta_gatk)

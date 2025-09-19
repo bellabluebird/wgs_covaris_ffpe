@@ -7,9 +7,10 @@ process GATK_COMBINEGVCFS {
     // conda option
     conda 'bioconda::gatk4=4.4.0.0'
     
-    // input: collection of GVCF files and reference files
+    // input: collection of GVCF files, their indices, and reference files
     input:
     path gvcfs
+    path gvcf_indices
     path reference_files
     
     // output: combined GVCF file for joint genotyping
