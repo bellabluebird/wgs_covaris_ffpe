@@ -6,9 +6,6 @@ process BWA_MEM2_INDEX {
     // publish alongside reference FASTA for future reuse
     publishDir "s3://bp-wgs-covaris-input-data/reference", mode: 'copy'
 
-    // conda option
-    conda 'bioconda::bwa-mem2=2.2.1'
-
     // input: reference fasta file
     input:
     path fasta
