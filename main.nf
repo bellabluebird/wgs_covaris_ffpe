@@ -28,10 +28,30 @@ include { GATK_COMBINEGVCFS } from './modules/gatk_combinegvcfs.nf'
 include { GATK_VARIANTFILTRATION } from './modules/gatk_variantfiltration.nf'
 include { BCFTOOLS_STATS } from './modules/bcftools_stats.nf'
 include { MULTIQC } from './modules/multiqc.nf'
+include { MERGE_FASTQ } from './modules/merge_fastq.nf'
+
+// function to extract sample ID from filename
+def getSampleId(filename) {
+    def basename = filename.toString().split('/')[-1]
+    def parts = basename.split('_')
+
+    // handle different naming conventions
+    if (parts.size() >= 3 && (parts[1] =~ /^[SL]\d+$/)) {
+        // pattern: SampleName_S1_L001... or SampleName_L001...
+        return parts[0]
+    } else if (parts.size() >= 2) {
+        // pattern: SampleName_R1... or SampleName_anything...
+        return parts[0]
+    } else {
+        // fallback: use everything before first dot
+        return basename.split('\\.')[0]
+    }
+}
 
 // parameters - all data-specific parameters must be provided explicitly
 params.outdir = "./results"
 params.publish_mode = 'copy'
+params.merge_lanes = true  // set to false to disable lane merging
 
 // required parameters (no defaults - must be specified via CLI or profile)
 params.input_dir = null
@@ -44,8 +64,27 @@ log.info "Reference genome: ${params.reference}"
 log.info "Known sites: ${params.known_sites}"
 
 // create input channel from FASTQ files in input directory
-ch_input = Channel.fromFilePairs("${params.input_dir}/*_{R1,R2,1,2}.{fastq,fq}{,.gz}", checkIfExists: false)
-    .ifEmpty { error "No paired FASTQ files found in ${params.input_dir}. Expected pattern: *_{R1,R2,1,2}.{fastq,fq}{,.gz}" }
+if (params.merge_lanes) {
+    // group files by sample ID for merging multiple lanes
+    ch_input_raw = Channel.fromFilePairs("${params.input_dir}/*_{R1,R2,1,2}.{fastq,fq}{,.gz}", checkIfExists: false, flat: true)
+        .ifEmpty { error "No paired FASTQ files found in ${params.input_dir}. Expected pattern: *_{R1,R2,1,2}.{fastq,fq}{,.gz}" }
+        .map { prefix, r1, r2 ->
+            def sample_id = getSampleId(prefix)
+            tuple(sample_id, r1, r2)
+        }
+        .groupTuple(by: 0, sort: true)
+        .map { sample_id, r1_list, r2_list ->
+            tuple(sample_id, r1_list, r2_list)
+        }
+
+    log.info "Lane merging enabled - grouping files by sample ID"
+} else {
+    // use original single-pair approach
+    ch_input = Channel.fromFilePairs("${params.input_dir}/*_{R1,R2,1,2}.{fastq,fq}{,.gz}", checkIfExists: false)
+        .ifEmpty { error "No paired FASTQ files found in ${params.input_dir}. Expected pattern: *_{R1,R2,1,2}.{fastq,fq}{,.gz}" }
+
+    log.info "Lane merging disabled - processing individual file pairs"
+}
 
 // create reference channel from explicit parameter
 ch_reference_fasta = Channel.fromPath(params.reference)
@@ -61,6 +100,14 @@ ch_known_sites = ch_known_sites
 
 // main workflow
 workflow {
+    if (params.merge_lanes) {
+        // merge FASTQ files by sample before processing
+        merged_reads = MERGE_FASTQ(ch_input_raw)
+        ch_input = merged_reads.reads
+
+        log.info "Processing merged FASTQ files"
+    }
+
     // raw fastqc
     fastqc_raw = FASTQC(ch_input)
     
@@ -147,7 +194,13 @@ workflow {
     .mix(coverage_results.summary.map { id, file -> file })
     .mix(qualimap_results.results.map { id, dir -> dir })
     .mix(variant_stats.stats.map { id, file -> file })
-    .collect()
+
+    // add merge logs if lane merging was performed
+    if (params.merge_lanes) {
+        multiqc_input = multiqc_input.mix(merged_reads.log.map { id, file -> file })
+    }
+
+    multiqc_input = multiqc_input.collect()
 
     // multiqc report
     MULTIQC(multiqc_input)
