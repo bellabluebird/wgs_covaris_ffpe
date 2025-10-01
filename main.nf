@@ -66,8 +66,8 @@ log.info "Known sites: ${params.known_sites}"
 // create input channel from FASTQ files in input directory
 if (params.merge_lanes) {
     // group files by sample ID for merging multiple lanes
-    ch_input_raw = Channel.fromFilePairs("${params.input_dir}/*_{R1,R2,1,2}.{fastq,fq}{,.gz}", checkIfExists: false, flat: true)
-        .ifEmpty { error "No paired FASTQ files found in ${params.input_dir}. Expected pattern: *_{R1,R2,1,2}.{fastq,fq}{,.gz}" }
+    ch_input_raw = Channel.fromFilePairs("${params.input_dir}/*_R{1,2}_*.{fastq,fq}{,.gz}", checkIfExists: false, flat: true)
+        .ifEmpty { error "No paired FASTQ files found in ${params.input_dir}. Expected pattern: *_R{1,2}_*.{fastq,fq}{,.gz} (Illumina chunk naming)" }
         .map { prefix, r1, r2 ->
             def sample_id = getSampleId(prefix)
             tuple(sample_id, r1, r2)
@@ -80,8 +80,8 @@ if (params.merge_lanes) {
     log.info "Lane merging enabled - grouping files by sample ID"
 } else {
     // use original single-pair approach
-    ch_input = Channel.fromFilePairs("${params.input_dir}/*_{R1,R2,1,2}.{fastq,fq}{,.gz}", checkIfExists: false)
-        .ifEmpty { error "No paired FASTQ files found in ${params.input_dir}. Expected pattern: *_{R1,R2,1,2}.{fastq,fq}{,.gz}" }
+    ch_input = Channel.fromFilePairs("${params.input_dir}/*_R{1,2}_*.{fastq,fq}{,.gz}", checkIfExists: false)
+        .ifEmpty { error "No paired FASTQ files found in ${params.input_dir}. Expected pattern: *_R{1,2}_*.{fastq,fq}{,.gz} (Illumina chunk naming)" }
 
     log.info "Lane merging disabled - processing individual file pairs"
 }
