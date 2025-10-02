@@ -11,9 +11,9 @@ process MERGE_FASTQ {
     input:
     tuple val(sample_id), path(r1_files), path(r2_files)
 
-    // output: merged FASTQ files
+    // output: merged FASTQ files (as list to match FASTP input expectations)
     output:
-    tuple val(sample_id), path("${sample_id}_merged_R1.fastq.gz"), path("${sample_id}_merged_R2.fastq.gz"), emit: reads
+    tuple val(sample_id), path("${sample_id}_merged_{R1,R2}.fastq.gz"), emit: reads
     tuple val(sample_id), path("${sample_id}_merge_log.txt"), emit: log
 
     script:
