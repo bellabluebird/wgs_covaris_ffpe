@@ -66,24 +66,26 @@ log.info "Known sites: ${params.known_sites}"
 // create input channel from FASTQ files in input directory
 if (params.merge_lanes) {
     // group files by sample ID for merging multiple lanes
-    ch_input_raw = Channel.fromFilePairs("${params.input_dir}/*_R{1,2}_*.{fastq,fq}{,.gz}", checkIfExists: false, flat: true)
-        .ifEmpty { error "No paired FASTQ files found in ${params.input_dir}. Expected pattern: *_R{1,2}_*.{fastq,fq}{,.gz} (Illumina chunk naming)" }
-        .map { prefix, r1, r2 ->
-            def sample_id = getSampleId(prefix)
-            tuple(sample_id, r1, r2)
+    ch_input_raw = Channel.fromPath("${params.input_dir}/*_R{1,2}_*.{fastq,fq}{,.gz}")
+        .ifEmpty { error "No FASTQ files found in ${params.input_dir}. Expected pattern: *_R{1,2}_*.{fastq,fq}{,.gz}" }
+        .map { file ->
+            def sample_id = getSampleId(file.name)
+            tuple(sample_id, file)
         }
-        .groupTuple(by: 0, sort: true)
-        .map { sample_id, r1_list, r2_list ->
-            tuple(sample_id, r1_list, r2_list)
+        .groupTuple(by: 0)
+        .map { sample_id, files ->
+            // explicitly separate R1 and R2 files
+            def r1_files = files.findAll { it.name.contains('_R1_') }.sort()
+            def r2_files = files.findAll { it.name.contains('_R2_') }.sort()
+
+            if (r1_files.size() != r2_files.size()) {
+                error "Mismatched R1 (${r1_files.size()}) and R2 (${r2_files.size()}) file counts for sample: ${sample_id}"
+            }
+
+            tuple(sample_id, r1_files, r2_files)
         }
 
     log.info "Lane merging enabled - grouping files by sample ID"
-} else {
-    // use original single-pair approach
-    ch_input = Channel.fromFilePairs("${params.input_dir}/*_R{1,2}_*.{fastq,fq}{,.gz}", checkIfExists: false)
-        .ifEmpty { error "No paired FASTQ files found in ${params.input_dir}. Expected pattern: *_R{1,2}_*.{fastq,fq}{,.gz} (Illumina chunk naming)" }
-
-    log.info "Lane merging disabled - processing individual file pairs"
 }
 
 // create reference channel from explicit parameter
