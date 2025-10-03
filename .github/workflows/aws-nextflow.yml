@@ -4,11 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       profile:
-        description: 'Nextflow profile to use (only custom available)'
+        description: 'Nextflow profile to use'
         required: true
-        default: 'custom'
+        default: 'aws'
         type: choice
         options:
+        - aws
         - custom
       input_s3_path:
         description: 'S3 path to input FASTQ files (samples only)'
@@ -124,7 +125,7 @@ jobs:
         id: build_cmd
         run: |
           # Base command with profile
-          BASE_CMD="nextflow run main.nf -profile aws,${{ github.event.inputs.profile }}"
+          BASE_CMD="nextflow run main.nf -profile ${{ github.event.inputs.profile }}"
           
           # Always add input_dir and outdir
           BASE_CMD="$BASE_CMD --input_dir \"${{ github.event.inputs.input_s3_path }}\""
